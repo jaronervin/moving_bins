@@ -1,0 +1,14 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Moving Bins{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'rentals/site.css' %}">
+</head>
+<body>
+  <header><div class="wrap"><b>Moving Bins</b> <span class="muted">· Baltimore</span></div></header>
+  <main class="wrap">{% block content %}{% endblock %}</main>
+  <footer class="wrap">Reusable bins, delivered and picked up. Fewer boxes in the landfill.</footer>
+</body>
+</html>

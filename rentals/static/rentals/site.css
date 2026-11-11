@@ -1,0 +1,36 @@
+:root {
+  --bg: #f7f6f2; --card: #ffffff; --ink: #1f2a24; --muted: #5d6b63;
+  --accent: #2f6b4f; --accent-ink: #ffffff; --line: #dfe3dc; --warn: #9a3b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141a17; --card: #1d2520; --ink: #e8ece9; --muted: #a3b0a8;
+          --accent: #6fbf95; --accent-ink: #0f1a14; --line: #2e3a33; --warn: #f0a07f; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+header { padding: 20px 0; border-bottom: 1px solid var(--line); }
+header b { font-size: 1.15rem; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.15; margin: 32px 0 8px; }
+.lede { color: var(--muted); max-width: 40em; margin: 0 0 24px; }
+.grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .grid { grid-template-columns: 1.1fr 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.card h2 { margin: 0 0 12px; font-size: 1.15rem; }
+label { display: block; font-weight: 600; margin: 12px 0 4px; }
+input, select { width: 100%; padding: 10px 12px; font: inherit; color: inherit;
+                background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+button { margin-top: 16px; width: 100%; padding: 12px; font: inherit; font-weight: 600;
+         background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; cursor: pointer; }
+.errorlist { color: var(--warn); margin: 4px 0 0; padding: 0; list-style: none; font-size: .9rem; }
+.error { color: var(--warn); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; }
+td, th { padding: 6px 0; text-align: left; border-bottom: 1px solid var(--line); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.total td { font-weight: 700; border-bottom: 0; }
+.muted { color: var(--muted); font-size: .9rem; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 24px 0; }
+@media (min-width: 760px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+.stat b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+footer { margin: 40px 0; color: var(--muted); font-size: .9rem; }

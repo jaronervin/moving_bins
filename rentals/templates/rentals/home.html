@@ -1,0 +1,64 @@
+{% extends "rentals/base.html" %}
+{% load humanize %}
+{% block content %}
+<h1>Move with bins, not boxes.</h1>
+<p class="lede">
+  Sturdy 27-gallon bins with lids, dropped off at the place you're leaving and
+  picked up at your new home. Each bin helps hundreds of moves before it's
+  recycled, instead of a pile of cardboard after one.
+</p>
+
+<div class="grid">
+  <section class="card">
+    <h2>Get a price</h2>
+    <form method="get">
+      {% for field in form %}
+        {{ field.label_tag }} {{ field }} {{ field.errors }}
+      {% endfor %}
+      <button type="submit">See price</button>
+    </form>
+  </section>
+
+  <section class="card">
+    {% if quote %}
+      <h2>Your quote</h2>
+      <table>
+        {% for line in quote.lines %}
+        <tr><td>{{ line.quantity }} bins × ${{ line.unit_rate }}/week</td>
+            <td class="num">${{ line.weekly_total|intcomma }}</td></tr>
+        {% endfor %}
+        <tr><td>× {{ quote.weeks }} week{{ quote.weeks|pluralize }}</td>
+            <td class="num">${{ quote.rental_subtotal|intcomma }}</td></tr>
+        <tr><td>Dropoff (within {{ settings.dropoff_max_miles }} miles)</td><td class="num">Free</td></tr>
+        <tr><td>Pickup</td><td class="num">Free within {{ settings.pickup_free_miles }} mi</td></tr>
+        <tr class="total"><td>Total before tax</td><td class="num">${{ quote.total_before_tax|intcomma }}</td></tr>
+      </table>
+      <p class="muted">
+        Pickup on {{ pickup_date|date:"l, M j" }}. Pickups {{ settings.pickup_free_miles }}–{{ settings.pickup_max_miles }}
+        miles away add ${{ settings.pickup_rate_per_mile }} per mile over {{ settings.pickup_free_miles }}.
+        Nothing is charged until your bins are dropped off.
+      </p>
+      {% if error %}<p class="error">{{ error }}</p>{% else %}
+        <p class="muted">{{ available }} bins free for those dates.</p>{% endif %}
+    {% elif error %}
+      <p class="error">{{ error }}</p>
+    {% else %}
+      <h2>The more you rent, the less each costs</h2>
+      <table>
+        <tr><th>Bins</th><th class="num">Per bin / week</th><th class="num">Week total</th></tr>
+        {% for n, rate, total in rate_table %}
+        <tr><td>{{ n }}</td><td class="num">${{ rate }}</td><td class="num">${{ total }}</td></tr>
+        {% endfor %}
+      </table>
+      <p class="muted">Any number from {{ product.minimum_quantity }} up. The rate applies to every bin in your order.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="stats">
+  <div class="card stat"><b>{{ impact.moves|intcomma }}</b><span class="muted">moves served</span></div>
+  <div class="card stat"><b>{{ impact.bin_weeks|intcomma }}</b><span class="muted">bin-weeks rented</span></div>
+  <div class="card stat"><b>{{ impact.boxes_avoided|intcomma }}</b><span class="muted">cardboard boxes avoided</span></div>
+  <div class="card stat"><b>{{ impact.bins_recycled|intcomma }}</b><span class="muted">worn-out bins recycled</span></div>
+</div>
+{% endblock %}

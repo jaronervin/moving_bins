@@ -1,6 +1,6 @@
 # Moving Bins — Product & Technical Spec (v1 draft)
 
-Status: **draft for review**. Nothing is built yet. Items marked **OPEN** need a decision.
+Status: **approved, in progress** (milestones 1–2 built; see README). Items marked **OPEN** need a decision.
 
 ---
 
@@ -42,18 +42,18 @@ Launch target: **beginning of 2027**.
 - Rate slides in a straight line from **$5.00 at 20 bins** to **$3.00 at 100
   bins**, and stays at $3.00 above 100:
 
-  `rate(n) = 5.00 − 0.025 × (n − 20)` for 20 ≤ n ≤ 100
+  `rate(n) = 5.00 − 0.025 × (n − 20)` for 20 ≤ n ≤ 100, rounded to the cent
 
-  `weekly total = n × rate(n)`, rounded to the cent.
+  `weekly total = n × rate(n)` (so the receipt math always checks out)
 
 | Bins | Per bin | Weekly total |
 |---:|---:|---:|
-| 20 | $5.000 | $100.00 |
-| 35 | $4.625 | $161.88 |
-| 40 | $4.500 | $180.00 |
-| 60 | $4.000 | $240.00 |
-| 80 | $3.500 | $280.00 |
-| 100 | $3.000 | $300.00 |
+| 20 | $5.00 | $100.00 |
+| 35 | $4.63 | $162.05 |
+| 40 | $4.50 | $180.00 |
+| 60 | $4.00 | $240.00 |
+| 80 | $3.50 | $280.00 |
+| 100 | $3.00 | $300.00 |
 
   The total always increases with quantity, so a bigger order never costs
   less than a smaller one.
@@ -84,14 +84,15 @@ is a question for an accountant; Stripe handles it once the right tax code is
 set per line item.
 
 ### 2.5 Cancellation & changes
-- Cancel **48+ hours** before the dropoff window starts → full refund.
-- Cancel **inside 48 hours** → **50% refund of the rental**. The pickup fee
-  is refunded in full (that trip never happens). Tax is refunded in
-  proportion.
-- Before confirmation (nothing charged yet), cancelling just releases the hold.
+- Cancel **48+ hours** before the dropoff window starts → nothing charged.
+- Cancel **inside 48 hours** → the card is charged **50% of the rental**
+  (plus tax on that amount). No pickup fee, since that trip never happens.
+- Nothing is charged before dropoff (§6.1), so cancelling earlier just
+  releases the hold. No refunds needed.
 - Changes (quantity, dates, windows, addresses) are allowed until the same
   48-hour cutoff. Changes to dates/windows go back to the owner for approval.
-  Price differences are charged or refunded automatically.
+  Since nothing is charged until dropoff, the new price simply replaces the
+  old one.
 - **Early pickup:** renters may ask for an earlier pickup if they finish
   early (owner approves the window). No refund for unused days.
 
@@ -103,8 +104,8 @@ set per line item.
 - Charges, set in settings and stated in the agreement:
   - **Missing or broken bin (with or without its lid): $10** — the retail
     replacement cost.
-  - **Missing or broken lid only:** lid replacement cost — **OPEN** (what a
-    lid costs alone, if they can be bought separately).
+  - **Missing or broken lid only: $5.** Lids aren't sold separately, but
+    broken bins leave good spare lids behind (§4.1).
   - Scuffs, scratches and normal wear: no charge.
 - Charged to the saved card with an itemized email.
 
@@ -138,8 +139,8 @@ set per line item.
      yet"). The renter is reminded by email until they add it. **No dropoff
      happens without it**. The owner sees a "missing pickup address" flag,
      and the dropoff can't be marked done until the address is in.
-   - The pickup fee is charged when the address is added (or with the
-     rental, if it's known at booking).
+   - The pickup fee is quoted once the address is added, and charged with
+     the rental at dropoff.
 3. **Time windows** — choose a preferred dropoff window and pickup window
    from the windows the owners have published for those dates.
 4. **Contact** — name, email, phone, porch/access notes.
@@ -153,14 +154,12 @@ set per line item.
    private link to view, change or cancel the booking.
 
 ### 3.2 Owner response
-- **Accept** both windows → status `confirmed` → the saved card is
-  **charged** (rental + pickup fee + tax). Renter is emailed a receipt.
+- **Accept** both windows → status `confirmed`. Nothing is charged yet
+  (§6.1). Renter is emailed a confirmation.
 - **Propose** different window(s) → status `times_proposed` → renter gets an
-  email to accept or decline. Accepting confirms and charges.
+  email to accept or decline. Accepting confirms.
 - No owner action within 48h, or no renter answer within 48h of a proposal
   → hold expires, renter is emailed, nothing is charged.
-- If the charge fails at confirmation, renter is emailed a link to update the
-  card; the booking stays held for 48h.
 - Confirmed times and addresses can still be adjusted later by either side.
 
 ### 3.3 Renter's private link
@@ -191,8 +190,12 @@ Every bin set is in one of these states (counts, not individual bins):
 | `ready` | Clean, inspected, on the shelf | Yes |
 | `out` | With a renter | No |
 | `awaiting_check_in` | Picked up, not yet cleaned/inspected | Not yet |
-| `out_of_service` | Needs a lid, or other repair | No |
+| `out_of_service` | Bin is fine but needs a lid | No |
 | `retired` | Broken beyond use → recycling | No (leaves stock) |
+
+**Spare lids** are tracked as their own non-rentable item. When a bin breaks
+but its lid is fine, the lid goes into spares. A spare lid can return an
+`out_of_service` bin to `ready` in one step.
 
 Moves between states are recorded in the ledger, so the counts always
 add up and you can see history (e.g. how many bins were retired this year).
@@ -251,8 +254,8 @@ Shown on the public homepage and in the owner dashboard, all derived from
 bookings (no extra work at the door):
 - moves served
 - bin-weeks rented
-- estimated cardboard boxes avoided (bins × moves, using a settable
-  boxes-per-bin estimate)
+- estimated cardboard boxes avoided (bin-sets rented × **2.5 boxes** per
+  27-gallon bin; settable)
 - bins retired and recycled
 
 Per-bin lifetime counts ("this bin has helped 47 moves") would need a
@@ -269,9 +272,26 @@ but the ledger design leaves room for it.
 - This keeps us at the simplest PCI level (SAQ A, a short yearly
   self-assessment).
 - The card is saved with the renter's consent for later off-session charges
-  (confirmation, renewals, damage) — the agreement includes that
+  (dropoff, late cancellation, renewals, damage). The agreement includes that
   authorization.
-- Refunds (cancellation, reduced quantity) go back through Stripe.
+
+### 6.1 When money moves
+
+| Moment | What happens |
+|---|---|
+| Booking | Card verified and saved. **$0 charged.** |
+| ~24h before dropoff | **Authorization** (a pending hold, not a charge) for rental + pickup fee + tax. If it fails, the renter is emailed to update the card and the owner sees a flag *before* loading the truck. |
+| Dropoff marked done | Authorization **captured**, so this is when the charge actually happens. Receipt emailed. |
+| Cancel ≥ 48h out | Nothing. Any authorization is released. |
+| Cancel < 48h out | 50% of rental + tax charged (taken from the authorization if there is one; the rest is released). |
+| Missed pickup (renewal) | One week at the locked rate, charged right away. |
+| Check-in damage | Damage total charged. |
+
+The authorization step is optional (a setting). Without it, the card is
+simply charged when dropoff is marked done, and a declined card is only
+discovered at the door.
+- Refunds are rare, since nothing is charged before dropoff. If one is
+  needed (e.g. an owner-side mistake) it goes back through Stripe.
 - Saved cards are **detached 30 days after a booking closes** if no damage
   claim is open.
 - Owners must enable two-factor auth on the Stripe account.
@@ -298,7 +318,7 @@ but the ledger design leaves room for it.
 
 Transactional only: request received, times proposed, confirmed + receipt,
 reminder the day before each visit, renewed, returned/closed, damage charge,
-cancelled/refunded, hold expired.
+cancelled, hold expired.
 
 ---
 
@@ -315,11 +335,11 @@ cancelled/refunded, hold expired.
 | `BookingLine` | booking, product, quantity, locked_unit_rate |
 | `TimeWindow` | date, start, end, max_stops |
 | `Visit` | booking, kind (dropoff/pickup), window, proposed_window, status, completed_at, photo |
-| `Charge` | booking, kind (rental/renewal/damage/refund), amount, tax, stripe_id, status |
+| `Charge` | booking, kind (rental/late_cancel/renewal/damage/refund), amount, tax, stripe_id, status (authorized/captured/released/failed/refunded) |
 | `AgreementVersion` | version, text, sha256, effective_at |
 | `Signature` | booking, agreement_version, typed_name, card_name, avs_line1, avs_zip, ip, user_agent, signed_at |
 | `CheckIn` | booking, product, good, missing, broken, lid_issues, checked_in_at, by |
-| `Settings` | base address, radii, $/mile, hold hours, cancel cutoff, late-cancel refund %, check-in deadline, vehicle capacity, boxes-per-bin |
+| `Settings` | base address, radii, $/mile, hold hours, cancel cutoff, late-cancel charge %, check-in deadline, vehicle capacity, boxes-per-bin |
 
 ---
 
@@ -327,7 +347,7 @@ cancelled/refunded, hold expired.
 
 | Piece | Choice | Est. monthly cost |
 |---|---|---|
-| App | Python 3.12 + Django 5, plain server-rendered pages + a little JS | — |
+| App | Python 3.12+ + Django 5.2 LTS, plain server-rendered pages + a little JS | — |
 | Database | Postgres | — |
 | Hosting | Render or Railway (web app + Postgres + daily scheduled job) | ~$15–20 |
 | Payments | Stripe (~2.9% + 30¢ per charge) + Stripe Tax (~0.5%) | per transaction |
@@ -349,7 +369,7 @@ availability and fees.
 | 1 | Project skeleton, models, admin | Products, stock ledger and bookings editable in admin |
 | 2 | Pricing, availability, distance fee logic | Fully tested; quote page works |
 | 3 | Renter booking flow | Quote → addresses → windows → contact |
-| 4 | Stripe: save card, charge on confirm, refunds | Works end-to-end in Stripe test mode |
+| 4 | Stripe: save card, authorize, charge at dropoff | Works end-to-end in Stripe test mode |
 | 5 | Agreement + signature evidence + PDF email | Signed copy arrives by email |
 | 6 | Owner tools: inbox, propose times, schedule, route, at-the-door | Owners can run a week from their phones |
 | 7 | Change/cancel link, renewals, damage charges, reminders | All lifecycle paths covered |
@@ -372,12 +392,13 @@ availability and fees.
 
 ## 13. Open questions
 
-1. Lid-only replacement price (can lids be bought separately?).
-2. Boxes-per-bin estimate for the impact stats (one bin ≈ 2 medium boxes?).
+None right now.
 
 Decided:
-- Late cancellation → 50% rental refund (§2.5).
-- Missing/broken bin → $10 (§2.6).
+- Late cancellation → 50% of rental charged (§2.5).
+- Missing/broken bin → $10; lid only → $5 (§2.6).
+- Nothing charged until dropoff; late cancel charges 50% (§6.1).
+- 2.5 boxes per bin for impact stats (§5.1).
 - Vehicle fits all 100 (§5).
 - Windows: configurable, tuned to demand (§5).
 - Booking allowed without moving-in address; no dropoff without it (§3.1).
