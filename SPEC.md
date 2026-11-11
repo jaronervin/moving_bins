@@ -10,7 +10,13 @@ A small rental site for reusable plastic moving bins, run by two owners.
 Renters book bins for whole weeks; the owners drop them off at the house
 being moved **out of** and pick them up at the house being moved **into**.
 
-**v1 scope:** one product (standard bins), 100 in stock to start.
+**Why:** sustainability first, savings second. Durable bins replace cardboard
+boxes that fall apart and get thrown away; each bin can serve hundreds of
+moves before being recycled. The site should say so, and show the running
+impact (see §5.1).
+
+**v1 scope:** one product (a standard bin **with its lid**, rented as a set),
+100 in stock to start.
 **Designed for later:** more bin sizes, hand trucks, dollies, blankets.
 The data model treats every rentable thing as a *product* with its own
 stock and pricing, so adding one is data entry, not new code.
@@ -79,23 +85,41 @@ set per line item.
 
 ### 2.5 Cancellation & changes
 - Cancel **48+ hours** before the dropoff window starts → full refund.
-- **OPEN:** what happens inside 48 hours (no refund? partial? a flat fee?).
+- Cancel **inside 48 hours** → **50% refund of the rental**. The pickup fee
+  is refunded in full (that trip never happens). Tax is refunded in
+  proportion.
+- Before confirmation (nothing charged yet), cancelling just releases the hold.
 - Changes (quantity, dates, windows, addresses) are allowed until the same
   48-hour cutoff. Changes to dates/windows go back to the owner for approval.
   Price differences are charged or refunded automatically.
+- **Early pickup:** renters may ask for an earlier pickup if they finish
+  early (owner approves the window). No refund for unused days.
 
 ### 2.6 Damage & loss
-- At pickup the owner records bins returned and bins damaged.
-- Missing/damaged bins are charged to the saved card at a per-bin
-  replacement price stated in the agreement. Renter gets an itemized email.
-- **OPEN:** replacement price per bin.
+- Damage is assessed at **check-in** (§4.2), not at the door, so it's done
+  carefully after cleaning. Check-in must be done within **3 days of
+  pickup**; after that, no damage charge for that booking. (Keeps renters
+  from being surprised weeks later.)
+- Charges, set in settings and stated in the agreement:
+  - **Missing or broken bin (with or without its lid): $10** — the retail
+    replacement cost.
+  - **Missing or broken lid only:** lid replacement cost — **OPEN** (what a
+    lid costs alone, if they can be bought separately).
+  - Scuffs, scratches and normal wear: no charge.
+- Charged to the saved card with an itemized email.
+
+> Why $10 and not $6–7: the weekly rent paid for the *use* of that bin for
+> the week. Once it's lost, you also lose every future rental it would have
+> earned, plus the time to buy and prep a replacement. Charging the full
+> replacement cost is standard and easy to defend. The bins quickly cover
+> their cost: at $3–5 a week, a $10 bin pays for itself in 2–4 rentals.
 
 ---
 
 ## 3. Booking lifecycle
 
 ```
- draft ──► requested ──► confirmed ──► out (dropped off) ──► returned ──► closed
+ draft ──► requested ──► confirmed ──► out (dropped off) ──► picked_up ──► checked_in ──► closed
               │  ▲            │              │
               │  │ renter     │              └─► renewed (+1 week, repeatable)
               ▼  │ accepts    ▼
@@ -110,6 +134,12 @@ set per line item.
 2. **Addresses** — moving-out (dropoff) and moving-in (pickup), with address
    autocomplete. Distances checked immediately; out-of-range is rejected with
    a clear message; pickup fee shown.
+   - The **moving-in address can be left blank** at booking ("I don't know
+     yet"). The renter is reminded by email until they add it. **No dropoff
+     happens without it**. The owner sees a "missing pickup address" flag,
+     and the dropoff can't be marked done until the address is in.
+   - The pickup fee is charged when the address is added (or with the
+     rental, if it's known at booking).
 3. **Time windows** — choose a preferred dropoff window and pickup window
    from the windows the owners have published for those dates.
 4. **Contact** — name, email, phone, porch/access notes.
@@ -150,7 +180,36 @@ for that address's bookings.
   inclusive**. Statuses that occupy stock: `requested`, `times_proposed`
   (while the hold is live), `confirmed`, `out`, `renewed`.
 - **Available(product, start, end)** = stock − the *peak* daily quantity
-  booked on any day in that range.
+  booked on any day in that range. For future dates this *assumes* bins
+  come back on their pickup date and pass check-in (no buffer day).
+
+### 4.1 Unit states
+Every bin set is in one of these states (counts, not individual bins):
+
+| State | Meaning | Rentable? |
+|---|---|---|
+| `ready` | Clean, inspected, on the shelf | Yes |
+| `out` | With a renter | No |
+| `awaiting_check_in` | Picked up, not yet cleaned/inspected | Not yet |
+| `out_of_service` | Needs a lid, or other repair | No |
+| `retired` | Broken beyond use → recycling | No (leaves stock) |
+
+Moves between states are recorded in the ledger, so the counts always
+add up and you can see history (e.g. how many bins were retired this year).
+
+### 4.2 Check-in
+After pickup the bins move to `awaiting_check_in`. Once cleaned and
+inspected, the owner records for that booking:
+- **good** → back to `ready`
+- **missing** bins / lids
+- **broken** bins → `retired` (recycled)
+- **lid missing/broken** → `out_of_service` until a lid is replaced
+
+This closes the booking and triggers any damage charge (§2.6).
+
+**Safety check:** the schedule warns when an upcoming dropoff needs more
+`ready` bins than are on the shelf (for example, a big job the morning after
+another big pickup that hasn't been checked in yet).
 - To prevent two people grabbing the last bins at the same moment, the
   availability check and the hold are done inside one database transaction
   that locks the product row.
@@ -166,9 +225,11 @@ Built on Django's admin plus a few custom pages.
 
 - **Requests inbox** — pending requests with requested windows; one click to
   accept, or pick alternatives to propose.
-- **Availability windows** — owners publish windows per date (e.g. Sat
-  8–10am, 10–12pm) with a max number of stops each. Renters can only pick
-  published windows with room.
+- **Availability windows** — owners publish windows per date with a max
+  number of stops each. Renters can only pick published windows with room.
+  Since demand is unknown, windows are fully configurable: set up a weekly
+  pattern (e.g. Sat/Sun 8–10, 10–12, 1–3) and add, remove or close
+  individual dates on top of it. Tune it as demand shows up.
 - **Schedule** — day and week views of all dropoffs and pickups, grouped by
   window, with bin counts, addresses, access notes and status.
 - **Route** — for any day + window: stops in an efficient order starting
@@ -176,12 +237,27 @@ Built on Django's admin plus a few custom pages.
   Google Maps" link with all stops. At this volume (a handful of stops), the
   best order can simply be computed exhaustively from a distance matrix.
 - **At the door** — from a phone: mark dropped off / picked up / missed
-  (renews), record returned & damaged counts, optional porch photo.
-- **Inventory** — current stock, the adjustments ledger, and a calendar of
-  bins out per day.
+  (renews), count of bin sets picked up, optional porch photo.
+- **Check-in** — list of bookings awaiting check-in; enter good / missing /
+  broken / lid issues per booking (§4.2).
+- **Inventory** — counts by state (ready, out, awaiting check-in, out of
+  service, retired), the ledger, and a calendar of bins out per day.
 
-**OPEN:** how many bins fit in the vehicle per trip? (Lets the route view
-warn when a window's dropoffs exceed one load.)
+Vehicle capacity: assumed to fit all 100 sets in one trip, so no load
+warnings for now. Kept as a setting in case that changes.
+
+### 5.1 Impact stats
+Shown on the public homepage and in the owner dashboard, all derived from
+bookings (no extra work at the door):
+- moves served
+- bin-weeks rented
+- estimated cardboard boxes avoided (bins × moves, using a settable
+  boxes-per-bin estimate)
+- bins retired and recycled
+
+Per-bin lifetime counts ("this bin has helped 47 moves") would need a
+label/QR code on every bin and a scan at each dropoff and pickup. Not in v1,
+but the ledger design leaves room for it.
 
 ---
 
@@ -230,9 +306,9 @@ cancelled/refunded, hold expired.
 
 | Table | Key fields |
 |---|---|
-| `Product` | name, slug, active, replacement_price, stripe_tax_code |
+| `Product` | name, slug, active, replacement_price, part_replacement_price (lid), stripe_tax_code |
 | `PricePoint` | product, min_quantity, unit_rate |
-| `StockAdjustment` | product, delta, reason, note, created_at |
+| `StockMovement` | product, quantity, from_state, to_state, booking (optional), reason, note, created_at |
 | `Customer` | name, email, phone, stripe_customer_id |
 | `Address` | line1, line2, city, state, zip, lat, lng, place_id |
 | `Booking` | customer, status, dropoff_date, weeks, pickup_date, dropoff_address, pickup_address, pickup_miles, pickup_fee, hold_expires_at, stripe_payment_method_id, access_notes |
@@ -242,8 +318,8 @@ cancelled/refunded, hold expired.
 | `Charge` | booking, kind (rental/renewal/damage/refund), amount, tax, stripe_id, status |
 | `AgreementVersion` | version, text, sha256, effective_at |
 | `Signature` | booking, agreement_version, typed_name, card_name, avs_line1, avs_zip, ip, user_agent, signed_at |
-| `ReturnReport` | booking, product, returned, damaged, missing |
-| `Settings` | base address, radii, $/mile, hold hours, cancel cutoff |
+| `CheckIn` | booking, product, good, missing, broken, lid_issues, checked_in_at, by |
+| `Settings` | base address, radii, $/mile, hold hours, cancel cutoff, late-cancel refund %, check-in deadline, vehicle capacity, boxes-per-bin |
 
 ---
 
@@ -296,11 +372,13 @@ availability and fees.
 
 ## 13. Open questions
 
-1. Cancellation inside 48 hours: no refund, partial, or a flat fee?
-2. Replacement price per lost/damaged bin.
-3. Vehicle capacity in bins per trip.
-4. Typical windows you'll publish (e.g. 2-hour blocks, which days).
-5. Can a renter book before they know the moving-in address (fill it in
-   later, say up to 3 days before pickup)?
-6. Should the pickup be allowed earlier than scheduled if they finish early
-   (no refund), or always on the booked date?
+1. Lid-only replacement price (can lids be bought separately?).
+2. Boxes-per-bin estimate for the impact stats (one bin ≈ 2 medium boxes?).
+
+Decided:
+- Late cancellation → 50% rental refund (§2.5).
+- Missing/broken bin → $10 (§2.6).
+- Vehicle fits all 100 (§5).
+- Windows: configurable, tuned to demand (§5).
+- Booking allowed without moving-in address; no dropoff without it (§3.1).
+- Early pickup allowed, no refund (§2.5).
