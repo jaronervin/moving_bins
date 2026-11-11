@@ -61,6 +61,9 @@ class BusinessSettings(models.Model):
         help_text="Charged per mile beyond the free distance.",
     )
 
+    min_notice_days = models.PositiveIntegerField(
+        default=3, help_text="Earliest dropoff a renter can book, in days from today."
+    )
     hold_hours = models.PositiveIntegerField(
         default=48, help_text="How long a request holds bins while awaiting a response."
     )

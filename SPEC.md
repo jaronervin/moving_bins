@@ -1,6 +1,6 @@
 # Moving Bins — Product & Technical Spec (v1 draft)
 
-Status: **approved, in progress** (milestones 1–2 built; see README). Items marked **OPEN** need a decision.
+Status: **approved, in progress** (milestones 1–3 built; see README). Items marked **OPEN** need a decision.
 
 ---
 
@@ -131,7 +131,8 @@ set per line item.
 
 ### 3.1 Renter flow (no accounts / passwords)
 1. **Quote** — pick quantity, dropoff date, number of weeks. Availability and
-   price update live.
+   price update live. Dropoff must be at least **3 days** out (setting), so
+   there's time to confirm before the 48-hour cancellation cutoff.
 2. **Addresses** — moving-out (dropoff) and moving-in (pickup), with address
    autocomplete. Distances checked immediately; out-of-range is rejected with
    a clear message; pickup fee shown.

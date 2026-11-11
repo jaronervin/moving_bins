@@ -1,0 +1,7 @@
+{% extends "rentals/base.html" %}
+{% block content %}
+<section class="card narrow-card">
+  <h2>That link has expired or isn't valid</h2>
+  <p><a href="{% url 'find_booking' %}">Get a fresh link by email</a>.</p>
+</section>
+{% endblock %}

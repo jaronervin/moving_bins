@@ -1,0 +1,55 @@
+{% extends "rentals/base.html" %}
+{% block title %}Booking {{ booking.reference }} · Moving Bins{% endblock %}
+{% block content %}
+<h1>Booking {{ booking.reference }}</h1>
+<p class="status status-{{ booking.status }}">{{ booking.get_status_display }}</p>
+{% if booking.status == "requested" %}
+  <p class="lede">We're holding your bins and will confirm your times by
+    {{ booking.hold_expires_at|date:"l, M j \a\t g:i A" }}.</p>
+{% endif %}
+
+{% if pickup_form and not booking.pickup_address %}
+<section class="card attention">
+  <h2>Add your moving-in address</h2>
+  <p class="muted">We need it before dropoff on {{ booking.dropoff_date|date:"l, M j" }}. Pickups are free within
+    {{ settings.pickup_free_miles }} miles, then ${{ settings.pickup_rate_per_mile }}/mile up to {{ settings.pickup_max_miles }}.</p>
+  <form method="post">{% csrf_token %}
+    {{ pickup_form }}
+    <button type="submit">Save address</button>
+  </form>
+</section>
+{% endif %}
+
+<div class="grid">
+  <section class="card">
+    <h2>Details</h2>
+    <dl class="facts">
+      {% for line in lines %}<dt>Bins</dt><dd>{{ line.quantity }} × {{ line.product.name }}</dd>{% endfor %}
+      {% with v=visits.dropoff %}
+      <dt>Dropoff</dt>
+      <dd>{{ booking.dropoff_date|date:"l, M j" }}{% if v %}, {% with w=v.window|default:v.proposed_window|default:v.requested_window %}{{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endwith %}
+          <span class="muted">({{ v.get_status_display|lower }})</span>{% endif %}<br>{{ booking.dropoff_address }}</dd>
+      {% endwith %}
+      {% with v=visits.pickup %}
+      <dt>Pickup</dt>
+      <dd>{{ booking.pickup_date|date:"l, M j" }}{% if v %}, {% with w=v.window|default:v.proposed_window|default:v.requested_window %}{{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endwith %}
+          <span class="muted">({{ v.get_status_display|lower }})</span>{% endif %}<br>
+          {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}<span class="error">Address needed</span>{% endif %}</dd>
+      {% endwith %}
+      {% if booking.access_notes %}<dt>Notes</dt><dd>{{ booking.access_notes|linebreaksbr }}</dd>{% endif %}
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Price</h2>
+    <table>
+      {% for line in lines %}
+      <tr><td>{{ line.quantity }} × ${{ line.locked_unit_rate|floatformat:2 }} × {{ booking.weeks }} wk</td><td class="num">${{ rental }}</td></tr>
+      {% endfor %}
+      <tr><td>Pickup{% if booking.pickup_miles is not None %} ({{ booking.pickup_miles }} mi){% endif %}</td>
+          <td class="num">{% if not booking.pickup_address %}TBD{% elif booking.pickup_fee %}${{ booking.pickup_fee }}{% else %}Free{% endif %}</td></tr>
+      <tr class="total"><td>Total before tax</td><td class="num">${{ total }}</td></tr>
+    </table>
+    <p class="muted">Charged when your bins are dropped off. Questions? Reply to your confirmation email.</p>
+  </section>
+</div>
+{% endblock %}

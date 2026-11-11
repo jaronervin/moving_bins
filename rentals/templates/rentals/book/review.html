@@ -1,0 +1,40 @@
+{% extends "rentals/base.html" %}
+{% block title %}Review · Moving Bins{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<div class="grid">
+  <section class="card">
+    <h2>Your move</h2>
+    <dl class="facts">
+      <dt>Dropoff</dt>
+      <dd>{{ dropoff_date|date:"l, M j" }}, {{ dropoff_window.start|time:"g:i A" }}–{{ dropoff_window.end|time:"g:i A" }}<br>
+          {{ draft.dropoff.formatted }}</dd>
+      <dt>Pickup</dt>
+      <dd>{{ pickup_date|date:"l, M j" }}, {{ pickup_window.start|time:"g:i A" }}–{{ pickup_window.end|time:"g:i A" }}<br>
+          {% if draft.pickup %}{{ draft.pickup.formatted }}{% else %}<span class="error">Address needed before dropoff</span>{% endif %}</dd>
+      <dt>Contact</dt>
+      <dd>{{ draft.contact.name }} · {{ draft.contact.email }} · {{ draft.contact.phone }}</dd>
+      {% if draft.contact.access_notes %}<dt>Notes</dt><dd>{{ draft.contact.access_notes|linebreaksbr }}</dd>{% endif %}
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Price</h2>
+    <table>
+      {% for line in quote.lines %}
+      <tr><td>{{ line.quantity }} bins × ${{ line.unit_rate }}/week</td><td class="num">${{ line.weekly_total }}</td></tr>
+      {% endfor %}
+      <tr><td>× {{ quote.weeks }} week{{ quote.weeks|pluralize }}</td><td class="num">${{ quote.rental_subtotal }}</td></tr>
+      <tr><td>Dropoff</td><td class="num">Free</td></tr>
+      <tr><td>Pickup{% if draft.pickup %} ({{ draft.pickup.miles|floatformat:0 }} mi){% endif %}</td>
+          <td class="num">{% if not draft.pickup %}TBD{% elif quote.pickup_fee %}${{ quote.pickup_fee }}{% else %}Free{% endif %}</td></tr>
+      <tr class="total"><td>Total before tax</td><td class="num">${{ quote.total_before_tax }}</td></tr>
+    </table>
+    <p class="muted">Nothing is charged now. Your card is charged when the bins are dropped off.</p>
+    <p class="note">Coming soon: saving your card and signing the rental agreement happen here.</p>
+    <form method="post">{% csrf_token %}
+      <button type="submit">Send request</button>
+    </form>
+    <p class="muted"><a href="{% url 'book_start_over' %}">Start over</a></p>
+  </section>
+</div>
+{% endblock %}

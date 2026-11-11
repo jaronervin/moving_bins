@@ -27,3 +27,53 @@ def generate_windows(start=None, days=60):
             )
             created += was_created
     return created
+
+
+def _visits_using(window, now):
+    """Visits currently claiming a stop in ``window``.
+
+    A visit claims the window it's asking for (requested), the one the owner
+    offered (proposed), or the agreed one (confirmed/done), as long as its
+    booking is still live.
+    """
+    from django.db.models import Q
+
+    from .models import Booking, Visit
+
+    live = Q(booking__status__in=Booking.COMMITTED_STATUSES) | Q(
+        booking__status__in=Booking.HOLD_STATUSES, booking__hold_expires_at__gt=now
+    )
+    claims = (
+        Q(status=Visit.Status.REQUESTED, requested_window=window)
+        | Q(status=Visit.Status.PROPOSED, proposed_window=window)
+        | Q(status__in=[Visit.Status.CONFIRMED, Visit.Status.DONE], window=window)
+    )
+    return Visit.objects.filter(live, claims)
+
+
+def stops_left(window, now=None):
+    now = now or timezone.now()
+    return max(0, window.max_stops - _visits_using(window, now).count())
+
+
+def open_windows(day, now=None):
+    """Windows on ``day`` that renters can still pick."""
+    now = now or timezone.now()
+    return [w for w in TimeWindow.objects.filter(date=day, is_open=True) if stops_left(w, now) > 0]
+
+
+def next_open_dates(start, count=6, now=None, horizon_days=90):
+    """The next ``count`` dates from ``start`` that have an open window."""
+    now = now or timezone.now()
+    dates = (
+        TimeWindow.objects.filter(date__gte=start, date__lte=start + timedelta(days=horizon_days),
+                                  is_open=True)
+        .values_list("date", flat=True).distinct().order_by("date")
+    )
+    found = []
+    for d in dates:
+        if open_windows(d, now):
+            found.append(d)
+            if len(found) == count:
+                break
+    return found

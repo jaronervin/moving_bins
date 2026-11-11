@@ -95,3 +95,34 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ---------------------------------------------------------------------------
+# Business integrations
+# ---------------------------------------------------------------------------
+
+# Maps: "google" in production (needs GOOGLE_MAPS_API_KEY); "fake" locally,
+# which estimates distances from a small table of ZIP codes (see rentals/maps.py).
+MAPS_BACKEND = os.environ.get("MAPS_BACKEND", "fake" if DEBUG else "google")
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+
+# Email: printed to the terminal locally; a real provider is set up at deploy.
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Moving Bins <bookings@localhost>")
+
+# Who gets "new request" emails. Comma-separated.
+OWNER_EMAILS = [e.strip() for e in os.environ.get("OWNER_EMAILS", "").split(",") if e.strip()]
+
+# Used to build links in emails, e.g. https://example.com (no trailing slash).
+SITE_URL = os.environ.get("SITE_URL", "http://127.0.0.1:8000")
+
+# How long the private booking link in an email keeps working.
+BOOKING_LINK_MAX_AGE_DAYS = 120

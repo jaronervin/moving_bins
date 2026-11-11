@@ -1,0 +1,10 @@
+{{ booking.customer.name }} ({{ booking.customer.email }}{% if booking.customer.phone %}, {{ booking.customer.phone }}{% endif %})
+
+{% for line in booking.lines.all %}{{ line.quantity }} × {{ line.product.name }}
+{% endfor %}
+Dropoff {{ booking.dropoff_date|date:"D M j" }} — {{ booking.dropoff_address }} ({{ booking.dropoff_miles }} mi)
+{% for v in booking.visits.all %}  {{ v.get_kind_display }} window requested: {{ v.requested_window }}
+{% endfor %}Pickup  {{ booking.pickup_date|date:"D M j" }} — {% if booking.pickup_address %}{{ booking.pickup_address }} ({{ booking.pickup_miles }} mi, fee ${{ booking.pickup_fee }}){% else %}ADDRESS NOT GIVEN YET{% endif %}
+
+Hold expires {{ booking.hold_expires_at|date:"D M j, g:i A" }}.
+Respond: {{ admin_link }}

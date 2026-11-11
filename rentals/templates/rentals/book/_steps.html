@@ -1,0 +1,7 @@
+<ol class="steps">
+  {% for name, label in steps %}
+    <li class="{% if name == step %}current{% elif name in done %}done{% endif %}">
+      {% if name in done and name != step %}<a href="{% url 'book_'|add:name %}">{{ label }}</a>{% else %}{{ label }}{% endif %}
+    </li>
+  {% endfor %}
+</ol>

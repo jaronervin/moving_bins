@@ -1,0 +1,1 @@
+New request {{ booking.reference }}: {% for line in booking.lines.all %}{{ line.quantity }} bins{% endfor %}, {{ booking.dropoff_date|date:"D M j" }}

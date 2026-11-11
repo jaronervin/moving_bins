@@ -1,0 +1,29 @@
+{% extends "rentals/base.html" %}
+{% block title %}Delivery times · Moving Bins{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+{% if no_times %}
+  <section class="card">
+    <h2>No times left</h2>
+    <p>Our delivery times for those dates just filled up.
+      <a href="{% url 'book_dates' %}">Choose different dates</a>.</p>
+  </section>
+{% else %}
+<form method="post">{% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="grid">
+    <section class="card">
+      <h2>Dropoff · {{ dropoff_date|date:"l, M j" }}</h2>
+      {{ form.dropoff_window.errors }}{{ form.dropoff_window }}
+    </section>
+    <section class="card">
+      <h2>Pickup · {{ pickup_date|date:"l, M j" }}</h2>
+      {{ form.pickup_window.errors }}{{ form.pickup_window }}
+    </section>
+  </div>
+  <p class="muted">These are requests. We'll confirm within 48 hours or suggest another time.
+    You don't need to be home; we can leave bins on a porch.</p>
+  <button type="submit" class="narrow">Continue</button>
+</form>
+{% endif %}
+{% endblock %}

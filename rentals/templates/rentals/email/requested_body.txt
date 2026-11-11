@@ -1,0 +1,17 @@
+Hi {{ booking.customer.name }},
+
+Thanks for choosing reusable bins for your move! Here's what you asked for:
+
+  {% for line in booking.lines.all %}{{ line.quantity }} × {{ line.product.name }}
+  {% endfor %}Dropoff: {{ booking.dropoff_date|date:"l, F j" }}, {{ booking.dropoff_address }}
+  Pickup:  {{ booking.pickup_date|date:"l, F j" }}, {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}address still needed{% endif %}
+
+We're holding your bins and will confirm your delivery times within 48 hours.
+Nothing is charged until your bins are dropped off.
+{% if not booking.pickup_address %}
+Please add the address you're moving into before dropoff day. We can't drop
+off without it. You can add it here:
+{% endif %}
+View or change your booking: {{ link }}
+
+Reference: {{ booking.reference }}

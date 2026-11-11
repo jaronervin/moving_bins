@@ -39,7 +39,8 @@
         Nothing is charged until your bins are dropped off.
       </p>
       {% if error %}<p class="error">{{ error }}</p>{% else %}
-        <p class="muted">{{ available }} bins free for those dates.</p>{% endif %}
+        <p class="muted">{{ available }} bins free for those dates.</p>
+        <a class="button" href="{% url 'book_dates' %}?{{ request.GET.urlencode }}">Book these bins</a>{% endif %}
     {% elif error %}
       <p class="error">{{ error }}</p>
     {% else %}

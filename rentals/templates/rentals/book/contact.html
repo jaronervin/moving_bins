@@ -1,0 +1,12 @@
+{% extends "rentals/base.html" %}
+{% block title %}Contact · Moving Bins{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<section class="card narrow-card">
+  <h2>How do we reach you?</h2>
+  <form method="post">{% csrf_token %}
+    {{ form }}
+    <button type="submit">Continue</button>
+  </form>
+</section>
+{% endblock %}

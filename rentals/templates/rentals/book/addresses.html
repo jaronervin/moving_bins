@@ -1,0 +1,21 @@
+{% extends "rentals/base.html" %}
+{% block title %}Addresses · Moving Bins{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<form method="post">{% csrf_token %}
+<div class="grid">
+  <section class="card">
+    <h2>Moving out of</h2>
+    <p class="muted">We drop the bins off here. Must be within {{ settings.dropoff_max_miles }} driving miles of us.</p>
+    {{ dropoff_form }}
+  </section>
+  <section class="card">
+    <h2>Moving into</h2>
+    <p class="muted">We pick the bins up here. Free within {{ settings.pickup_free_miles }} miles,
+      then ${{ settings.pickup_rate_per_mile }} per mile up to {{ settings.pickup_max_miles }} miles.</p>
+    {{ pickup_form }}
+  </section>
+</div>
+<button type="submit" class="narrow">Continue</button>
+</form>
+{% endblock %}

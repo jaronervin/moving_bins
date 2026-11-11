@@ -1,0 +1,1 @@
+Your Moving Bins booking link{{ links|length|pluralize }}

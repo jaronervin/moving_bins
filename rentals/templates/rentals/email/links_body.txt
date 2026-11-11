@@ -1,0 +1,6 @@
+Here {{ links|length|pluralize:"is your booking link,are your booking links" }}:
+
+{% for booking, link in links %}{{ booking.reference }} — dropoff {{ booking.dropoff_date|date:"D M j" }}
+{{ link }}
+
+{% endfor %}If you didn't ask for this, you can ignore this email.

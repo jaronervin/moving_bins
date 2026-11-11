@@ -1,0 +1,29 @@
+{% extends "rentals/base.html" %}
+{% block title %}Book bins · Moving Bins{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<div class="grid">
+  <section class="card">
+    <h2>How many, and when?</h2>
+    <form method="post">{% csrf_token %}
+      {{ form }}
+      {% if suggestions %}
+        <p class="muted">Next days with open times:
+          {% for d in suggestions %}{{ d|date:"D M j" }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+      <button type="submit">Continue</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Good to know</h2>
+    <ul class="plain">
+      <li>Bins come with lids and rent by the week.</li>
+      <li>We drop off at the place you're leaving and pick up at your new place.</li>
+      <li>Nothing is charged until your bins are dropped off.</li>
+      <li>Free cancellation up to 48 hours before dropoff.</li>
+      <li>The earliest dropoff you can book is {{ form.earliest|date:"l, M j" }}.</li>
+    </ul>
+    {% if quote %}<p>That's <b>${{ quote.rental_subtotal }}</b> before any pickup fee and tax.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

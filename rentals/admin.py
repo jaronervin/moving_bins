@@ -31,7 +31,7 @@ class BusinessSettingsAdmin(admin.ModelAdmin):
         ("Base", {"fields": ["base_address", "base_lat", "base_lng"]}),
         ("Service area", {"fields": ["dropoff_max_miles", "pickup_free_miles",
                                      "pickup_max_miles", "pickup_rate_per_mile"]}),
-        ("Holds, cancellation, payment", {"fields": ["hold_hours", "cancel_cutoff_hours",
+        ("Holds, cancellation, payment", {"fields": ["min_notice_days", "hold_hours", "cancel_cutoff_hours",
                                                      "late_cancel_charge_percent",
                                                      "authorize_hours_before_dropoff"]}),
         ("Operations", {"fields": ["check_in_deadline_days", "vehicle_capacity", "boxes_per_bin"]}),
