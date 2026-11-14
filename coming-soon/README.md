@@ -1,23 +1,28 @@
 # Coming-soon page (sprouttoteco.com)
 
-A single static page, `index.html`, served by Cloudflare Pages until the real
-site launches. No build step, no external scripts or fonts.
+A single static page, `public/index.html`, served by a Cloudflare Worker until
+the real site launches. No build step, no external scripts or fonts.
 
-**Adding the logo:** put the file in this folder (e.g. `logo.svg`) and replace
-the text inside `<a class="brand">` with
-`<img src="logo.svg" alt="Sprout Tote Co." height="40">`.
+## Publish it (Cloudflare Workers, free)
 
-## Publish it (Cloudflare Pages, free)
+Files: `wrangler.jsonc` (settings) and `public/` (what visitors get). Only
+`public/` is published.
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
-   **Connect to Git** → pick `jaronervin/moving_bins`.
-2. Production branch: the repo's default branch. Framework preset: **None**.
-   Build command: *(leave empty)*. Build output directory: `coming-soon`.
-3. **Save and Deploy**. You get a `*.pages.dev` address to check.
-4. In the Pages project → **Custom domains** → add `sprouttoteco.com`, then
-   `www.sprouttoteco.com`. Cloudflare creates the DNS records itself.
+1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import a
+   repository** → pick `jaronervin/moving_bins` → **Next**.
+2. On *Create and deploy*:
+   - **Project name:** `sprouttoteco` (must match `name` in `wrangler.jsonc`)
+   - **Build command:** leave empty
+   - **Deploy command:** `npx wrangler deploy` (the default)
+   - **Advanced settings → Path:** `coming-soon`
+3. **Deploy.** The config attaches `sprouttoteco.com` and
+   `www.sprouttoteco.com` and creates their DNS records, so don't add those
+   domains by hand.
 
-Every push to the production branch redeploys the page automatically.
+Every push to the production branch redeploys automatically.
+
+**Logo:** put the file in `public/` and replace the text inside
+`<a class="brand">` in `public/index.html`.
 
 ## Send `www` and the other three domains to sprouttoteco.com
 
@@ -50,9 +55,9 @@ would be fetched from it.)
 
 Then create a **Bulk Redirect rule** that uses the list, and deploy it.
 
-**`www.sprouttoteco.com` → `sprouttoteco.com`:** in the sprouttoteco.com
-zone → Rules → **Redirect Rules** → create from the template
-"Redirect from WWW to root", status 301, preserve query string.
+**`www.sprouttoteco.com` → `sprouttoteco.com`:** after the first deploy, in
+the sprouttoteco.com zone → Rules → **Redirect Rules** → create from the
+template "Redirect from WWW to root", status 301, preserve query string.
 
 ## Check
 

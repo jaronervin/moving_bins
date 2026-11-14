@@ -1,0 +1,15 @@
+// Cloudflare Worker that serves the coming-soon page as static files.
+// Only files in ./public are published; this config and the README are not.
+{
+  "name": "sprouttoteco",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+  // Attach the site to the domain and www on each deploy; Cloudflare creates the DNS records.
+  "routes": [
+    { "pattern": "sprouttoteco.com", "custom_domain": true },
+    { "pattern": "www.sprouttoteco.com", "custom_domain": true }
+  ]
+}
