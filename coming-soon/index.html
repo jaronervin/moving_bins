@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sprout Tote Co. · Coming soon</title>
+  <meta name="description" content="Reusable moving totes, dropped off at your old place and picked up at your new one. Coming to the Baltimore area in early 2027.">
+  <meta property="og:title" content="Sprout Tote Co. · Coming soon">
+  <meta property="og:description" content="Moving, minus the cardboard. Reusable totes, delivered and picked up. Baltimore area, early 2027.">
+  <meta property="og:url" content="https://sprouttoteco.com/">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://sprouttoteco.com/">
+  <meta name="theme-color" content="#2f6b4f">
+  <style>
+    :root {
+      --bg: #f6f4ee; --card: #ffffff; --ink: #1c2620; --muted: #56645b;
+      --accent: #2f6b4f; --accent-soft: #e3efe8; --line: #dde3dc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #121815; --card: #1a221d; --ink: #e8ede9; --muted: #a4b2a9;
+              --accent: #7cc59e; --accent-soft: #1f2e25; --line: #2b3830; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh; display: flex; flex-direction: column;
+      background: var(--bg); color: var(--ink);
+      font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    .wrap { width: 100%; max-width: 880px; margin: 0 auto; padding: 0 20px; }
+    header.wrap { padding-top: 28px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700;
+             font-size: 1.15rem; letter-spacing: .01em; color: var(--ink); text-decoration: none; }
+    /* Logo goes here: replace the text with <img src="logo.svg" alt="Sprout Tote Co." height="40"> */
+    main { flex: 1; display: flex; align-items: center; padding: 48px 0; }
+    .eyebrow { display: inline-block; font-size: .8rem; font-weight: 700; letter-spacing: .08em;
+               text-transform: uppercase; color: var(--accent); background: var(--accent-soft);
+               padding: 6px 12px; border-radius: 999px; margin: 0 0 20px; }
+    h1 { font-size: clamp(2.3rem, 7vw, 4rem); line-height: 1.05; letter-spacing: -.02em; margin: 0 0 18px; }
+    h1 span { color: var(--accent); }
+    .lede { font-size: clamp(1.05rem, 2.4vw, 1.25rem); color: var(--muted); max-width: 34em; margin: 0 0 36px; }
+    .points { display: grid; gap: 14px; grid-template-columns: 1fr; margin: 0; padding: 0; list-style: none; }
+    @media (min-width: 700px) { .points { grid-template-columns: repeat(3, 1fr); } }
+    .points li { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+    .points b { display: block; margin-bottom: 4px; }
+    .points span { color: var(--muted); font-size: .95rem; }
+    footer.wrap { padding-top: 24px; padding-bottom: 32px; color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <header class="wrap">
+    <a class="brand" href="/">Sprout Tote Co.</a>
+  </header>
+
+  <main class="wrap">
+    <div>
+      <p class="eyebrow">Coming early 2027 · Baltimore area</p>
+      <h1>Moving, minus<br><span>the cardboard.</span></h1>
+      <p class="lede">Sturdy, reusable moving totes, dropped off at the place you're leaving
+        and picked up at your new home. No boxes to buy, tape, break down or throw away.</p>
+      <ul class="points">
+        <li><b>Delivered and picked up</b><span>We bring the totes to you and collect them after you've unpacked.</span></li>
+        <li><b>Reused, not thrown out</b><span>Each tote helps move hundreds of homes before it's recycled.</span></li>
+        <li><b>Rented by the week</b><span>Take only what you need, for as long as your move takes.</span></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer class="wrap">© 2026 Sprout Tote Co.</footer>
+</body>
+</html>
