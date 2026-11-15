@@ -1,0 +1,27 @@
+{% extends "rentals/ops/_base.html" %}
+{% load static %}
+{% block ops_title %}{{ title }} {{ booking.reference }}{% endblock %}
+{% block ops %}
+<h1>{{ title }}: {{ booking.reference }}</h1>
+<p class="muted">{{ booking.customer.name }} ·
+  {% if mode == "load" %}dropoff {{ booking.dropoff_date|date:"D M j" }}, {{ booking.dropoff_address }}
+  {% else %}pickup {{ booking.pickup_date|date:"D M j" }}, {{ booking.pickup_address }}{% endif %}</p>
+
+<div class="grid">
+  <section class="card">
+    {% include "rentals/ops/_camera.html" %}
+  </section>
+  <section class="card">
+    <p class="big-count"><span id="done">{{ done }}</span> <span class="muted">of</span> <span id="total">{{ total }}</span></p>
+    <p class="muted">Tap a code to undo that scan.</p>
+    <ul class="chips" id="scanned">{% for c in scanned %}<li><button type="button" data-code="{{ c }}">{{ c }}</button></li>{% endfor %}</ul>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="finish">
+      <button type="submit">{% if mode == "load" %}Dropoff done{% else %}Pickup done{% endif %}</button>
+    </form>
+    {% if mode == "pickup" %}<p class="muted">Any tote not scanned is reported as not returned at check-in.</p>{% endif %}
+  </section>
+</div>
+<script>window.SCAN = {mode: "{{ mode }}", reference: "{{ booking.reference }}", api: "{% url 'ops_scan_api' %}"};</script>
+<script src="{% static 'rentals/ops-scanner.js' %}"></script>
+{% endblock %}

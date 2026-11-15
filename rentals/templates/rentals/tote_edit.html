@@ -1,0 +1,15 @@
+{% extends "rentals/base.html" %}
+{% block title %}Tote {{ bin.code }} · Sprout Tote Co.{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  <p class="eyebrow-code">{{ bin.code }}</p>
+  <h2>{% if editable %}What's in this tote?{% else %}Tote {{ bin.code }}{% endif %}</h2>
+  {% if not editable %}<p class="muted">This tote has been picked up, so its notes can't be changed.</p>{% endif %}
+  <form method="post">{% csrf_token %}
+    {{ form }}
+    <datalist id="room-list">{% for r in rooms %}<option value="{{ r }}">{% endfor %}</datalist>
+    {% if editable %}<button type="submit">Save</button>{% endif %}
+  </form>
+  <p class="muted"><a href="{{ booking_link }}#totes">See all my totes</a></p>
+</section>
+{% endblock %}

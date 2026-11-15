@@ -80,6 +80,9 @@ class BusinessSettings(models.Model):
     check_in_deadline_days = models.PositiveIntegerField(
         default=3, help_text="Damage can only be charged if check-in happens within this."
     )
+    contents_retention_days = models.PositiveIntegerField(
+        default=30, help_text="Renters' tote contents notes are deleted this long after pickup."
+    )
     vehicle_capacity = models.PositiveIntegerField(
         default=100, help_text="Bin sets that fit in one trip."
     )
@@ -122,6 +125,11 @@ class Product(models.Model):
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     is_rentable = models.BooleanField(default=True)
+    is_serialized = models.BooleanField(
+        default=False,
+        help_text="Each unit has its own QR label and is tracked one by one (see Bin). "
+        "Otherwise units are only counted, through the stock ledger.",
+    )
     active = models.BooleanField(default=True, help_text="Shown to renters.")
     minimum_quantity = models.PositiveIntegerField(default=1)
     replacement_price = models.DecimalField(
@@ -190,6 +198,7 @@ class StockState(models.TextChoices):
     AWAITING_CHECK_IN = "awaiting_check_in", "Awaiting check-in"
     OUT_OF_SERVICE = "out_of_service", "Out of service (needs a lid)"
     RETIRED = "retired", "Retired (recycled)"
+    MISSING = "missing", "Missing (not returned)"
 
 
 class StockMovement(models.Model):
@@ -628,3 +637,96 @@ class CheckIn(models.Model):
     @property
     def total(self):
         return self.good + self.broken + self.lid_issues + self.missing
+
+
+# ---------------------------------------------------------------------------
+# Individually tracked bins (QR labels)
+# ---------------------------------------------------------------------------
+
+
+class Bin(models.Model):
+    """One physical bin with its own label code, e.g. "K7Q".
+
+    For serialized products, these rows ARE the inventory: counts per state
+    come from here, not from the StockMovement ledger. Every change is also
+    written to BinEvent, so each bin has a full history.
+    """
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="bins")
+    code = models.CharField(max_length=8, unique=True)
+    status = models.CharField(max_length=32, choices=StockState.choices, default=StockState.READY)
+    booking = models.ForeignKey(
+        "Booking",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bins",
+        help_text="The booking this bin is currently out with (cleared at check-in).",
+    )
+    moves = models.PositiveIntegerField(default=0, help_text="Rentals completed.")
+    created_at = models.DateTimeField(default=timezone.now)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return self.code
+
+
+class BinEvent(models.Model):
+    """Something that happened to one bin. Never edited."""
+
+    class Kind(models.TextChoices):
+        REGISTERED = "registered", "Added to inventory"
+        LOADED = "loaded", "Loaded for dropoff"
+        UNLOADED = "unloaded", "Taken off a load (scan undone)"
+        PICKED_UP = "picked_up", "Picked up"
+        PICKUP_UNDONE = "pickup_undone", "Pickup scan undone"
+        CHECKED_IN_GOOD = "checked_in_good", "Checked in: good"
+        CHECKED_IN_BROKEN = "checked_in_broken", "Checked in: broken (retired)"
+        CHECKED_IN_LID = "checked_in_lid", "Checked in: lid missing/broken"
+        MARKED_MISSING = "marked_missing", "Not returned"
+        FOUND = "found", "Found after being missing"
+        LID_REPAIRED = "lid_repaired", "Fitted with a spare lid"
+        ADJUSTED = "adjusted", "Status changed by hand"
+
+    bin = models.ForeignKey(Bin, on_delete=models.CASCADE, related_name="events")
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    booking = models.ForeignKey(
+        "Booking", on_delete=models.SET_NULL, null=True, blank=True, related_name="bin_events"
+    )
+    at = models.DateTimeField(default=timezone.now)
+    by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-at", "-id"]
+
+    def __str__(self):
+        return f"{self.bin}: {self.get_kind_display()}"
+
+
+class BinContents(models.Model):
+    """What a renter wrote about one bin during one rental.
+
+    Belongs to the rental, not the bin: the next renter starts blank. Deleted
+    ``contents_retention_days`` after pickup.
+    """
+
+    booking = models.ForeignKey("Booking", on_delete=models.CASCADE, related_name="bin_contents")
+    bin = models.ForeignKey(Bin, on_delete=models.CASCADE, related_name="contents_notes")
+    contents = models.TextField(blank=True)
+    room = models.CharField(max_length=60, blank=True)
+    fragile = models.BooleanField(default=False)
+    open_first = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "bin contents"
+        constraints = [
+            models.UniqueConstraint(fields=["booking", "bin"], name="one_note_per_bin_per_booking")
+        ]
+
+    def __str__(self):
+        return f"{self.bin} in {self.booking.reference}"

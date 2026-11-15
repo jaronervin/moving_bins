@@ -116,7 +116,7 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Moving Bins <bookings@localhost>")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Sprout Tote Co. <bookings@localhost>")
 
 # Who gets "new request" emails. Comma-separated.
 OWNER_EMAILS = [e.strip() for e in os.environ.get("OWNER_EMAILS", "").split(",") if e.strip()]
@@ -126,3 +126,9 @@ SITE_URL = os.environ.get("SITE_URL", "http://127.0.0.1:8000")
 
 # How long the private booking link in an email keeps working.
 BOOKING_LINK_MAX_AGE_DAYS = 120
+
+# What the QR code on each tote label points to. Upper case keeps QR codes
+# small (QR "alphanumeric" mode). sprouttote.com redirects to the main site,
+# keeping the /Q/<code> part.
+QR_BASE_URL = os.environ.get("QR_BASE_URL", "HTTPS://SPROUTTOTE.COM/Q/")
+LOGIN_URL = "admin:login"

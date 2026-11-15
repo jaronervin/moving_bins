@@ -1,5 +1,5 @@
 {% extends "rentals/base.html" %}
-{% block title %}Booking {{ booking.reference }} · Moving Bins{% endblock %}
+{% block title %}Booking {{ booking.reference }} · Sprout Tote Co.{% endblock %}
 {% block content %}
 <h1>Booking {{ booking.reference }}</h1>
 <p class="status status-{{ booking.status }}">{{ booking.get_status_display }}</p>
@@ -27,12 +27,12 @@
       {% for line in lines %}<dt>Bins</dt><dd>{{ line.quantity }} × {{ line.product.name }}</dd>{% endfor %}
       {% with v=visits.dropoff %}
       <dt>Dropoff</dt>
-      <dd>{{ booking.dropoff_date|date:"l, M j" }}{% if v %}, {% with w=v.window|default:v.proposed_window|default:v.requested_window %}{{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endwith %}
+      <dd>{{ booking.dropoff_date|date:"l, M j" }}{% if v %}{% with w=v.window|default:v.proposed_window|default:v.requested_window %}{% if w %}, {{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endif %}{% endwith %}
           <span class="muted">({{ v.get_status_display|lower }})</span>{% endif %}<br>{{ booking.dropoff_address }}</dd>
       {% endwith %}
       {% with v=visits.pickup %}
       <dt>Pickup</dt>
-      <dd>{{ booking.pickup_date|date:"l, M j" }}{% if v %}, {% with w=v.window|default:v.proposed_window|default:v.requested_window %}{{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endwith %}
+      <dd>{{ booking.pickup_date|date:"l, M j" }}{% if v %}{% with w=v.window|default:v.proposed_window|default:v.requested_window %}{% if w %}, {{ w.start|time:"g:i A" }}–{{ w.end|time:"g:i A" }}{% endif %}{% endwith %}
           <span class="muted">({{ v.get_status_display|lower }})</span>{% endif %}<br>
           {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}<span class="error">Address needed</span>{% endif %}</dd>
       {% endwith %}
@@ -52,4 +52,51 @@
     <p class="muted">Charged when your bins are dropped off. Questions? Reply to your confirmation email.</p>
   </section>
 </div>
+{% if totes or totes_editable %}
+<section class="card totes" id="totes">
+  <div class="totes-head">
+    <h2>Your totes{% if totes %} <span class="muted">({{ totes|length }})</span>{% endif %}</h2>
+    {% if totes %}<button type="button" class="link-button no-print" onclick="window.print()">Print list</button>{% endif %}
+  </div>
+  {% if totes_editable %}
+    <p class="muted no-print">Scan the QR code on any tote with your phone's camera to note what's inside.
+      No camera? <a href="{% url 'find_tote' %}">Type the code</a>.</p>
+  {% endif %}
+  {% if totes %}
+    <input type="search" id="tote-search" class="no-print" placeholder="Search, e.g. pots and pans" aria-label="Search totes">
+    <ul class="tote-list" id="tote-list">
+      {% for row in totes %}
+      <li data-search="{{ row.bin.code }} {{ row.note.contents }} {{ row.note.room }}{% if row.note.fragile %} fragile{% endif %}{% if row.note.open_first %} open first{% endif %}">
+        <a class="tote-code" href="{% url 'tote' row.bin.code %}">{{ row.bin.code }}</a>
+        <div>
+          {% if row.note.room %}<b>{{ row.note.room }}</b>{% endif %}
+          {% if row.note.fragile %}<span class="badge">Fragile</span>{% endif %}
+          {% if row.note.open_first %}<span class="badge">Open first</span>{% endif %}
+          <div>{% if row.note.contents %}{{ row.note.contents|linebreaksbr }}{% else %}<span class="muted">Nothing noted yet</span>{% endif %}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted" id="tote-none" hidden>No totes match.</p>
+    <script>
+      (function () {
+        var input = document.getElementById("tote-search"), items = document.querySelectorAll("#tote-list li"),
+            none = document.getElementById("tote-none");
+        input.addEventListener("input", function () {
+          var words = input.value.toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
+          items.forEach(function (li) {
+            var text = li.dataset.search.toLowerCase(),
+                hit = words.every(function (w) { return text.indexOf(w) !== -1; });
+            li.hidden = !hit; if (hit) shown++;
+          });
+          none.hidden = shown !== 0;
+        });
+      })();
+    </script>
+    <p class="muted">Notes are deleted {{ settings.contents_retention_days }} days after pickup.</p>
+  {% else %}
+    <p class="muted">Your totes will show up here once they're delivered.</p>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

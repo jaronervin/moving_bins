@@ -9,14 +9,16 @@ from django.utils import timezone
 from rentals import inventory, services
 from rentals.models import Booking, StockState, Visit
 
-from .helpers import bins, make_booking
+from .helpers import bins, blankets, make_booking
 
 NOW = timezone.make_aware(datetime(2027, 1, 1, 12, 0))
 
 
 class LedgerTests(TestCase):
+    """Counted products (e.g. blankets) go through the stock ledger."""
+
     def setUp(self):
-        self.bins = bins()
+        self.bins = blankets()
         inventory.record_purchase(self.bins, 100)
 
     def test_purchase_goes_to_ready(self):
@@ -40,7 +42,7 @@ class LedgerTests(TestCase):
         )
         c = inventory.counts(self.bins)
         self.assertEqual(c, {"ready": 95, "out": 0, "awaiting_check_in": 0,
-                             "out_of_service": 2, "retired": 2})
+                             "out_of_service": 2, "retired": 2, "missing": 0})
         # 3 bins (2 broken + 1 missing) × $10 + 2 lids × $5
         self.assertEqual(check.damage_amount, D("40.00"))
 
@@ -127,7 +129,7 @@ class AvailabilityTests(TestCase):
         self.assertEqual(inventory.available(self.bins, date(2027, 1, 20), date(2027, 1, 27), now=NOW), 0)
 
     def test_out_of_service_bins_not_bookable(self):
-        inventory._move(self.bins, 10, StockState.READY, StockState.OUT_OF_SERVICE, "adjustment")
+        self._out_of_service(10)
         self.assertEqual(inventory.available(self.bins, date(2027, 1, 9), date(2027, 1, 16), now=NOW), 90)
 
     def test_rebooking_same_booking_excludes_itself(self):
@@ -140,12 +142,17 @@ class AvailabilityTests(TestCase):
         line = b.lines.get()
         self.assertEqual(line.locked_weekly_total, D("162.05"))
 
+    def _out_of_service(self, n):
+        from rentals.models import Bin
+        ids = Bin.objects.filter(status="ready").values_list("id", flat=True)[:n]
+        Bin.objects.filter(id__in=list(ids)).update(status="out_of_service")
+
     def test_ready_shortfall_warning(self):
         a = self.hold(70, date(2027, 1, 2))
         b = self.hold(30, date(2027, 1, 4))
         for bk in (a, b):
             bk.status = Booking.Status.CONFIRMED
             bk.save()
-        inventory._move(self.bins, 10, StockState.READY, StockState.OUT_OF_SERVICE, "adjustment")
+        self._out_of_service(10)
         warnings = inventory.ready_shortfalls(self.bins, today=date(2027, 1, 1))
         self.assertEqual(warnings, [(date(2027, 1, 4), 100, 90)])

@@ -259,9 +259,41 @@ bookings (no extra work at the door):
   27-gallon bin; settable)
 - bins retired and recycled
 
-Per-bin lifetime counts ("this bin has helped 47 moves") would need a
-label/QR code on every bin and a scan at each dropoff and pickup. Not in v1,
-but the ledger design leaves room for it.
+Each bin also counts its own rentals ("this tote has helped 23 moves"), see §5.2.
+
+### 5.2 QR-labelled totes
+
+Every bin has a permanent 3-character code (e.g. `K7Q`: no 0/O/1/I/L, rude
+combinations skipped, never reused) and a waterproof label on two sides with
+a QR code and the code in large print. The QR points to
+`HTTPS://SPROUTTOTE.COM/Q/K7Q` (upper case keeps the code small), which
+redirects to the main site with the code kept. Lids aren't labelled.
+
+**Owners (staff login, phone camera, no app):**
+- **Load at base:** scan each bin onto the booking; the page shows "19 of 20".
+  Dropoff can only be marked done when the count matches and the renter has
+  given their moving-in address. Tap a code to undo a scan.
+- **Pickup:** scan bins back. Unscanned bins are listed.
+- **Check-in after cleaning:** pick Good / Lid missing / Broken (optionally
+  "lid still good" → spare), scan. Closing the rental marks any bin never
+  scanned at pickup as **missing** and works out the damage charge from the
+  actual bins: $10 per broken or missing bin, $5 per lid issue.
+- **Bin page:** full history; fit a spare lid; mark a missing bin found.
+- **Labels:** printable sheet, 2" square labels, 15 per Letter page, 1–2
+  copies per bin.
+
+**Renters:** scanning a tote opens a short form: what's inside, room at the
+new place (suggestions + rooms they've used), Fragile, Open first. Their
+booking page lists every tote with search ("pans" → `K7Q`) and a print view.
+Notes can be edited only while the totes are with them and are **deleted 30
+days after pickup** (setting).
+
+**Privacy:** a stranger who scans a tote sees only "this is a Sprout Tote Co.
+tote". Contents show only on a browser that has opened the renter's private
+booking link (so family or movers they share the link with can help).
+
+Bins are the source of truth for bin counts; the stock ledger now covers
+counted items only (spare lids, and later blankets etc.).
 
 ---
 
@@ -340,6 +372,9 @@ cancelled, hold expired.
 | `AgreementVersion` | version, text, sha256, effective_at |
 | `Signature` | booking, agreement_version, typed_name, card_name, avs_line1, avs_zip, ip, user_agent, signed_at |
 | `CheckIn` | booking, product, good, missing, broken, lid_issues, checked_in_at, by |
+| `Bin` | product, code, status, booking (current), moves, created_at |
+| `BinEvent` | bin, kind (loaded, picked up, checked in…), booking, at, by |
+| `BinContents` | booking, bin, contents, room, fragile, open_first (deleted 30 days after pickup) |
 | `Settings` | base address, radii, $/mile, hold hours, cancel cutoff, late-cancel charge %, check-in deadline, vehicle capacity, boxes-per-bin |
 
 ---

@@ -105,6 +105,14 @@ class StockMovementAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
+        if obj.product.is_serialized:
+            # Tracked bins aren't counted in the ledger: a purchase creates bins with codes.
+            if obj.reason == StockMovement.Reason.PURCHASE and obj.to_state == StockState.READY:
+                made = inventory.record_purchase(obj.product, obj.quantity, user=request.user, note=obj.note)
+                self.message_user(request, f"Added {len(made)} bins. Print their labels from Bins.")
+            else:
+                self.message_user(request, "Bins are tracked one by one: change them under Bins.", level="error")
+            return
         obj.created_by = request.user
         super().save_model(request, obj, form, change)
 
@@ -203,3 +211,54 @@ class SignatureAdmin(admin.ModelAdmin):
 @admin.register(CheckIn)
 class CheckInAdmin(admin.ModelAdmin):
     list_display = ["booking", "product", "good", "broken", "lid_issues", "missing", "damage_amount", "checked_in_at"]
+
+
+# ---------------------------------------------------------------------------
+# Individually tracked bins
+# ---------------------------------------------------------------------------
+
+from django.shortcuts import redirect  # noqa: E402
+from django.urls import reverse  # noqa: E402
+
+from .models import Bin, BinContents, BinEvent  # noqa: E402
+
+
+class BinEventInline(admin.TabularInline):
+    model = BinEvent
+    extra = 0
+    can_delete = False
+    readonly_fields = ["at", "kind", "booking", "by", "note"]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Bin)
+class BinAdmin(admin.ModelAdmin):
+    list_display = ["code", "product", "status", "booking", "moves", "created_at"]
+    list_filter = ["status", "product"]
+    search_fields = ["code", "booking__reference"]
+    readonly_fields = ["code", "product", "booking", "moves", "created_at"]
+    fields = ["code", "product", "status", "booking", "moves", "created_at", "notes"]
+    inlines = [BinEventInline]
+    actions = ["print_labels"]
+
+    @admin.action(description="Print QR labels for selected bins")
+    def print_labels(self, request, queryset):
+        ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True))
+        return redirect(f"{reverse('ops_labels')}?ids={ids}")
+
+    def has_add_permission(self, request):
+        return False  # add bins with the "register bins" purchase (Stock movements) or seed
+
+    def save_model(self, request, obj, form, change):
+        if change and "status" in form.changed_data:
+            BinEvent.objects.create(bin=obj, kind=BinEvent.Kind.ADJUSTED, by=request.user,
+                                    note=f"Status set to {obj.get_status_display()}")
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(BinContents)
+class BinContentsAdmin(admin.ModelAdmin):
+    list_display = ["bin", "booking", "room", "fragile", "open_first", "updated_at"]
+    search_fields = ["bin__code", "booking__reference"]

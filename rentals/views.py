@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
-from . import emails, inventory, links, maps, pricing, services
+from . import emails, inventory, links, maps, pricing, services, totes
 from .forms import FindBookingForm, PickupAddressForm, QuoteForm
 from .models import Booking, BusinessSettings, Product
 
@@ -61,6 +61,7 @@ def booking_detail(request, token):
         "customer", "dropoff_address", "pickup_address").first()
     if booking is None:
         raise Http404
+    totes.remember_booking(request, booking)
 
     can_add_pickup = booking.status in services.EDITABLE_STATUSES
     pickup_form = None
@@ -96,6 +97,8 @@ def booking_detail(request, token):
         "total": rental + booking.pickup_fee,
         "pickup_form": pickup_form,
         "settings": BusinessSettings.load(),
+        "totes": totes.totes_for(booking),
+        "totes_editable": booking.status == Booking.Status.OUT,
     })
 
 

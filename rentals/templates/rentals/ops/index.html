@@ -1,0 +1,42 @@
+{% extends "rentals/ops/_base.html" %}
+{% block ops %}
+<h1>Owner tools</h1>
+<div class="grid">
+  <section class="card">
+    <h2>To load (next 14 days)</h2>
+    {% for b, progress in to_load %}
+      <p><a href="{% url 'ops_scanner' b.reference 'load' %}"><b>{{ b.dropoff_date|date:"D M j" }}</b> · {{ b.reference }} · {{ b.customer.name }}</a><br>
+        {% for p, n, want in progress %}<span class="muted">{{ n }} of {{ want }} loaded</span>{% endfor %}
+        {% if not b.pickup_address_id %}<span class="badge">No moving-in address</span>{% endif %}</p>
+    {% empty %}<p class="muted">Nothing confirmed.</p>{% endfor %}
+  </section>
+  <section class="card">
+    <h2>Out now: pick up</h2>
+    {% for b, n in out %}
+      <p><a href="{% url 'ops_scanner' b.reference 'pickup' %}"><b>{{ b.pickup_date|date:"D M j" }}</b> · {{ b.reference }} · {{ b.customer.name }}</a>
+        <span class="muted">· {{ n }} totes</span></p>
+    {% empty %}<p class="muted">Nothing out.</p>{% endfor %}
+  </section>
+  <section class="card">
+    <h2>To check in</h2>
+    {% for b, prog in picked %}
+      <p><a href="{% url 'ops_check_in' %}">{{ b.reference }} · {{ b.customer.name }}</a>
+        <span class="muted">· {{ prog.1 }} waiting{% if prog.2 %}, {{ prog.2 }} not returned{% endif %}</span></p>
+    {% empty %}<p class="muted">Nothing waiting.</p>{% endfor %}
+  </section>
+  <section class="card">
+    <h2>Stock</h2>
+    {% for p, c in stock %}
+      <p><b>{{ p }}</b></p>
+      <table>
+        <tr><td>Ready</td><td class="num">{{ c.ready }}</td></tr>
+        <tr><td>Out with renters</td><td class="num">{{ c.out }}</td></tr>
+        <tr><td>Awaiting check-in</td><td class="num">{{ c.awaiting_check_in }}</td></tr>
+        <tr><td>Needs a lid</td><td class="num">{{ c.out_of_service }}</td></tr>
+        <tr><td>Missing</td><td class="num">{{ c.missing }}</td></tr>
+        <tr><td>Retired</td><td class="num">{{ c.retired }}</td></tr>
+      </table>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

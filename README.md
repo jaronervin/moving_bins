@@ -15,11 +15,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate        # creates db.sqlite3 with the bin product and prices
-python manage.py seed_dev       # 100 bins on the shelf + weekend delivery windows
+python manage.py seed_dev       # 100 coded bins on the shelf + weekend delivery windows
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
+- Owner tools (log in first): http://127.0.0.1:8000/ops/ (phones only allow the camera on
+  `https://` sites or `localhost`, so the scanner's camera works once deployed; typing codes works anywhere)
 - Quote page: http://127.0.0.1:8000/
 - Book: http://127.0.0.1:8000/book/
 - Owner admin: http://127.0.0.1:8000/admin/
@@ -59,6 +61,9 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/inventory.py` | Stock counts from the ledger, availability by date, dropoff/pickup/check-in |
 | `rentals/services.py` | Placing a hold without overbooking; expiring holds |
 | `rentals/windows.py` | Weekly window pattern → dated delivery windows; open windows with room |
+| `rentals/bins.py` | Tracked totes: codes, loading, pickup, check-in, missing, spare lids |
+| `rentals/totes.py` | Renter tote pages: scan a QR to note contents, search their totes |
+| `rentals/ops.py` | Owner tools: camera scanner pages, bin history, printable QR labels |
 | `rentals/booking_flow.py` | The renter's booking steps (dates → addresses → times → contact → review) |
 | `rentals/maps.py` | Address lookup and driving distance (Google, or a fake for development) |
 | `rentals/links.py` | Private, signed booking links (no renter accounts) |
@@ -73,6 +78,7 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 - [x] 2. Pricing, availability and fee logic (tested); quote page
 - [x] 3. Renter booking flow, private booking link, add moving-in address later.
       *Card and agreement steps slot into Review in milestones 4–5.*
+- [x] QR-labelled totes: per-bin tracking, scanner pages, labels, renter contents notes
 - [ ] 4. Stripe
 - [ ] 5. Agreement and signature evidence
 - [ ] 6. Owner tools: inbox, schedule, route, at-the-door, check-in

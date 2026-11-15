@@ -1,0 +1,7 @@
+{% extends "rentals/base.html" %}
+{% block title %}{% block ops_title %}Owner tools{% endblock %} · Sprout Tote Co.{% endblock %}
+{% block content %}
+<p class="ops-nav no-print"><a href="{% url 'ops_index' %}">Today</a> · <a href="{% url 'ops_check_in' %}">Check-in</a>
+  · <a href="{% url 'ops_labels' %}">Labels</a> · <a href="{% url 'admin:index' %}">Admin</a></p>
+{% block ops %}{% endblock %}
+{% endblock %}

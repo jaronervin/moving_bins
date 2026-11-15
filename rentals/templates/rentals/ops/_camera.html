@@ -1,0 +1,9 @@
+<div class="camera">
+  <video id="video" playsinline muted></video>
+  <button type="button" id="start-camera">Start camera</button>
+</div>
+<p id="scan-msg" class="scan-msg" role="status" aria-live="polite">Point the camera at a tote's QR code.</p>
+<form id="manual" class="manual">
+  <input id="manual-code" maxlength="8" autocapitalize="characters" autocomplete="off" placeholder="Or type a code" aria-label="Tote code">
+  <button type="submit">Add</button>
+</form>

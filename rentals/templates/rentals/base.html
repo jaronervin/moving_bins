@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Moving Bins{% endblock %}</title>
+  <title>{% block title %}Sprout Tote Co.{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'rentals/site.css' %}">
 </head>
 <body>
   <header><div class="wrap head">
-    <a href="{% url 'home' %}" class="brand"><b>Moving Bins</b> <span class="muted">· Baltimore</span></a>
+    <a href="{% url 'home' %}" class="brand"><b>Sprout Tote Co.</b> <span class="muted">· Baltimore</span></a>
     <nav><a href="{% url 'book_dates' %}">Book</a> <a href="{% url 'find_booking' %}">My booking</a></nav>
   </div></header>
   <main class="wrap">
     {% if messages %}<div class="messages">{% for m in messages %}<p class="msg {{ m.tags }}">{{ m }}</p>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="wrap">Reusable bins, delivered and picked up. Fewer boxes in the landfill.</footer>
+  <footer class="wrap">Reusable moving totes, delivered and picked up. Fewer boxes in the landfill.</footer>
 </body>
 </html>

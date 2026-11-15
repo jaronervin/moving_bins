@@ -1,0 +1,33 @@
+{% extends "rentals/ops/_base.html" %}
+{% load static %}
+{% block ops_title %}Check-in{% endblock %}
+{% block ops %}
+<h1>Check-in</h1>
+<p class="muted">Clean each tote, pick what you found, then scan it. The choice goes back to <b>Good</b> after each scan.</p>
+<div class="grid">
+  <section class="card">
+    <div class="outcomes" role="radiogroup" aria-label="Outcome">
+      <label><input type="radio" name="outcome" value="good" checked> Good</label>
+      <label><input type="radio" name="outcome" value="lid"> Lid missing/broken</label>
+      <label><input type="radio" name="outcome" value="broken"> Broken (retire)</label>
+    </div>
+    <label class="salvage"><input type="checkbox" id="lid-salvaged"> Broken tote's lid is still good (keep as spare)</label>
+    {% include "rentals/ops/_camera.html" %}
+    <ul class="chips" id="scanned"></ul>
+  </section>
+  <section class="card">
+    <h2>Waiting ({{ waiting|length }})</h2>
+    <p class="mono">{% for b in waiting %}{{ b.code }}{% if not forloop.last %} {% endif %}{% empty %}<span class="muted">None</span>{% endfor %}</p>
+    <h2>Finish a rental</h2>
+    {% for b, prog in bookings %}
+      <form method="post" action="{% url 'ops_finish_check_in' b.reference %}">{% csrf_token %}
+        <p><b>{{ b.reference }}</b> · {{ b.customer.name }}<br>
+          <span class="muted">{{ prog.0 }} checked, {{ prog.1 }} waiting{% if prog.2 %}, {{ prog.2 }} not returned{% endif %}</span></p>
+        <button type="submit" {% if prog.1 %}disabled{% endif %}>Close rental</button>
+      </form>
+    {% empty %}<p class="muted">No rentals waiting.</p>{% endfor %}
+  </section>
+</div>
+<script>window.SCAN = {mode: "check_in", api: "{% url 'ops_scan_api' %}"};</script>
+<script src="{% static 'rentals/ops-scanner.js' %}"></script>
+{% endblock %}

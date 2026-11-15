@@ -32,7 +32,15 @@ class InventoryError(ValueError):
 
 
 def counts(product):
-    """Units of ``product`` in each state, e.g. {"ready": 80, "out": 20, ...}."""
+    """Units of ``product`` in each state, e.g. {"ready": 80, "out": 20, ...}.
+
+    Individually tracked products (bins) are counted from their Bin rows;
+    everything else from the StockMovement ledger.
+    """
+    if product.is_serialized:
+        from . import bins
+
+        return bins.counts(product)
     result = {state.value: 0 for state in StockState}
     moves = StockMovement.objects.filter(product=product)
     for row in moves.exclude(to_state="").values("to_state").annotate(n=Sum("quantity")):
@@ -153,22 +161,32 @@ def _move(product, quantity, from_state, to_state, reason, booking=None, user=No
 
 
 def record_purchase(product, quantity, user=None, note=""):
-    """New units arrive and go straight onto the shelf."""
+    """New units arrive and go straight onto the shelf.
+
+    For individually tracked products this creates the bins and their codes.
+    """
+    if product.is_serialized:
+        from . import bins
+
+        return bins.register_bins(product, quantity, user=user, note=note)
     return _move(product, quantity, None, StockState.READY, StockMovement.Reason.PURCHASE, user=user, note=note)
 
 
 @transaction.atomic
 def record_dropoff(booking, user=None):
-    """Bins leave the shelf for the renter's house."""
-    for line in booking.lines.select_related("product"):
+    """Counted items leave the shelf for the renter's house.
+
+    Individually tracked bins are handled by scanning (rentals.bins).
+    """
+    for line in booking.lines.select_related("product").filter(product__is_serialized=False):
         _move(line.product, line.quantity, StockState.READY, StockState.OUT,
               StockMovement.Reason.DROPOFF, booking=booking, user=user)
 
 
 @transaction.atomic
 def record_pickup(booking, user=None):
-    """Bins come back from the renter and wait to be cleaned and inspected."""
-    for line in booking.lines.select_related("product"):
+    """Counted items come back from the renter and wait to be cleaned and inspected."""
+    for line in booking.lines.select_related("product").filter(product__is_serialized=False):
         _move(line.product, line.quantity, StockState.OUT, StockState.AWAITING_CHECK_IN,
               StockMovement.Reason.PICKUP, booking=booking, user=user)
 
@@ -248,9 +266,11 @@ def impact_stats():
     sets_rented = lines.aggregate(n=Sum("quantity"))["n"] or 0
     bin_weeks = sum(line.quantity * line.booking.total_weeks for line in lines.select_related("booking"))
     boxes = int(sets_rented * BusinessSettings.load().boxes_per_bin)
+    from .models import Bin
+
     retired = (
         StockMovement.objects.filter(to_state=StockState.RETIRED).aggregate(n=Sum("quantity"))["n"] or 0
-    )
+    ) + Bin.objects.filter(status=StockState.RETIRED).count()
     return {
         "moves": done.count(),
         "bin_weeks": bin_weeks,

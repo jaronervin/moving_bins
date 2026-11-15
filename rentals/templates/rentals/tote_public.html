@@ -1,0 +1,18 @@
+{% extends "rentals/base.html" %}
+{% block title %}Tote {{ code }} · Sprout Tote Co.{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  {% if known %}
+    <p class="eyebrow-code">{{ code }}</p>
+    <h2>This is a Sprout Tote Co. moving tote</h2>
+    <p>Reusable totes, dropped off and picked up, so there's no cardboard to throw away.</p>
+    <p class="muted"><b>Renting this tote?</b> Open the booking link from your confirmation email on this
+      phone once, then scan again to note what's inside.
+      <a href="{% url 'find_booking' %}">Email me my link</a>.</p>
+  {% else %}
+    <h2>We don't recognize that code</h2>
+    <p class="muted">Check the letters on the tote's label and <a href="{% url 'find_tote' %}">try again</a>.</p>
+  {% endif %}
+  <p><a href="{% url 'home' %}">About Sprout Tote Co.</a></p>
+</section>
+{% endblock %}
