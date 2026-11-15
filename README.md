@@ -69,7 +69,8 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/links.py` | Private, signed booking links (no renter accounts) |
 | `rentals/emails.py` | Emails; text is in `templates/rentals/email/` |
 | `rentals/admin.py` | Owner back office |
-| `rentals/management/commands/daily_tasks.py` | Run once a day: expire holds, add windows |
+| `rentals/management/commands/daily_tasks.py` | Run once a day: expire holds, add windows, delete old tote notes |
+| `rentals/management/commands/create_codes.py` | Create tote codes ahead of time for sticker printing |
 | `rentals/tests/` | Tests for all of the above |
 
 ## Progress

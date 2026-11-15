@@ -34,6 +34,7 @@
         <tr><td>Awaiting check-in</td><td class="num">{{ c.awaiting_check_in }}</td></tr>
         <tr><td>Needs a lid</td><td class="num">{{ c.out_of_service }}</td></tr>
         <tr><td>Missing</td><td class="num">{{ c.missing }}</td></tr>
+        <tr><td>Labels not on a tote yet</td><td class="num">{{ c.reserved }}</td></tr>
         <tr><td>Retired</td><td class="num">{{ c.retired }}</td></tr>
       </table>
     {% endfor %}

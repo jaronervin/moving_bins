@@ -199,6 +199,7 @@ class StockState(models.TextChoices):
     OUT_OF_SERVICE = "out_of_service", "Out of service (needs a lid)"
     RETIRED = "retired", "Retired (recycled)"
     MISSING = "missing", "Missing (not returned)"
+    RESERVED = "reserved", "Code printed, not on a tote yet"
 
 
 class StockMovement(models.Model):
@@ -688,6 +689,7 @@ class BinEvent(models.Model):
         CHECKED_IN_LID = "checked_in_lid", "Checked in: lid missing/broken"
         MARKED_MISSING = "marked_missing", "Not returned"
         FOUND = "found", "Found after being missing"
+        ACTIVATED = "activated", "Label put on a tote; in service"
         LID_REPAIRED = "lid_repaired", "Fitted with a spare lid"
         ADJUSTED = "adjusted", "Status changed by hand"
 

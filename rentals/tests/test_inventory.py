@@ -42,7 +42,8 @@ class LedgerTests(TestCase):
         )
         c = inventory.counts(self.bins)
         self.assertEqual(c, {"ready": 95, "out": 0, "awaiting_check_in": 0,
-                             "out_of_service": 2, "retired": 2, "missing": 0})
+                             "out_of_service": 2, "retired": 2, "missing": 0,
+                             "reserved": 0})
         # 3 bins (2 broken + 1 missing) × $10 + 2 lids × $5
         self.assertEqual(check.damage_amount, D("40.00"))
 

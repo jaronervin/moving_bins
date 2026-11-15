@@ -14,7 +14,7 @@ from django.utils import timezone
 from rentals import inventory, links
 from rentals.models import Booking, TimeWindow, Visit
 
-from .helpers import bins
+from .helpers import assert_redirects_to_booking, bins
 
 
 def address(prefix, zip_code="21218", line1="10 Elm St"):
@@ -60,7 +60,7 @@ class BookingFlowTests(TestCase):
         self.assertEqual(str(booking.pickup_fee), "15.00")  # 5 miles × $3
         self.assertEqual(booking.visits.get(kind="dropoff").requested_window, self.drop_window)
         self.assertEqual(booking.access_notes, "Side porch")
-        self.assertRedirects(r, links.booking_url(booking))
+        assert_redirects_to_booking(self, r, booking)
 
         page = self.client.get(links.booking_url(booking))
         self.assertContains(page, booking.reference)

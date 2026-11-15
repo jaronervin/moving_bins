@@ -13,7 +13,7 @@ from django.utils import timezone
 from rentals import bins, inventory, links, services
 from rentals.models import Bin, BinContents, Booking, StockState, Visit
 
-from .helpers import bins as bin_product, make_booking
+from .helpers import assert_redirects_to_booking, bins as bin_product, make_booking
 
 NOW = timezone.make_aware(datetime(2027, 1, 1, 12, 0))
 
@@ -174,7 +174,7 @@ class RenterToteTests(TestCase):
         self.assertContains(r, "Room at the new place")
         r = self.client.post(f"/q/{self.code}", {"contents": "Pots and pans", "room": "Kitchen",
                                                  "fragile": "on"})
-        self.assertRedirects(r, links.booking_url(self.booking) + "#totes", fetch_redirect_response=False)
+        assert_redirects_to_booking(self, r, self.booking, fragment="#totes")
         note = BinContents.objects.get()
         self.assertEqual((note.contents, note.room, note.fragile, note.open_first),
                          ("Pots and pans", "Kitchen", True, False))
@@ -277,3 +277,34 @@ class WarehouseScanTests(TestCase):
         bins.complete_dropoff(b)
         with self.assertRaisesMessage(bins.BinError, "isn't waiting for check-in"):
             bins.check_in_bin(code)
+
+
+class ReservedCodeTests(TestCase):
+    """Codes printed ahead of time aren't inventory until stuck on a tote."""
+
+    def test_reserved_codes_not_bookable_until_activated(self):
+        made = bins.register_bins(bin_product(), 5, reserved=True)
+        bins.register_bins(bin_product(), 2)
+        self.assertEqual(inventory.available(bin_product(), date(2027, 1, 9), date(2027, 1, 16), now=NOW), 2)
+        with self.assertRaisesMessage(bins.BinError, "Good"):
+            bins.check_in_bin(made[0].code, "broken")
+        bins.check_in_bin(made[0].code, "good")  # scanned in at the check-in page
+        bins.activate_bin(made[1].code)            # or from its bin page
+        self.assertEqual(inventory.available(bin_product(), date(2027, 1, 9), date(2027, 1, 16), now=NOW), 4)
+        self.assertEqual(inventory.counts(bin_product())["reserved"], 3)
+        with self.assertRaisesMessage(bins.BinError, "already in service"):
+            bins.activate_bin(made[1].code)
+
+    def test_reserved_codes_cant_be_loaded(self):
+        bins.register_bins(bin_product(), 1)  # one real tote, so the rental can be booked
+        code = bins.register_bins(bin_product(), 1, reserved=True)[0].code
+        with self.assertRaisesMessage(bins.BinError, "isn't on the shelf"):
+            bins.load_bin(rental(qty=1), code)
+
+    def test_create_codes_command(self):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command("create_codes", "4", stdout=out)
+        self.assertIn("Created 4 codes (reserved for printing)", out.getvalue())
+        self.assertEqual(Bin.objects.filter(status="reserved").count(), 4)

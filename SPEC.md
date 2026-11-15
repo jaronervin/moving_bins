@@ -281,8 +281,15 @@ redirects to the main site with the code kept. Lids aren't labelled.
   scanned at pickup as **missing** and works out the damage charge from the
   actual bins: $10 per broken or missing bin, $5 per lid issue.
 - **Bin page:** full history; fit a spare lid; mark a missing bin found.
-- **Labels:** printable sheet, 2" square labels, 15 per Letter page, 1–2
-  copies per bin.
+- **Labels:** printable sheet, 2" square labels, 15 per Letter page, 1–4
+  copies per bin. Professional waterproof stickers are planned: two on each
+  tote plus a spare of the same code for a damaged sticker.
+- **Codes printed ahead of time:** codes can be created as *reserved*
+  (`python manage.py create_codes 100`) for a print run before all the totes
+  exist. Reserved codes aren't inventory and can't be booked or loaded. When a
+  label goes on a tote, scanning it at check-in with Good (or "Put in
+  service" on its page) puts it on the shelf. A replacement for a destroyed
+  tote gets a new code from this pool, not the old tote's.
 
 **Renters:** scanning a tote opens a short form: what's inside, room at the
 new place (suggestions + rooms they've used), Fragile, Open first. Their

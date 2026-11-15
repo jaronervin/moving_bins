@@ -72,11 +72,17 @@ def new_code():
 
 
 @transaction.atomic
-def register_bins(product, quantity, user=None, note=""):
-    """Add ``quantity`` new bins to the shelf, each with a fresh code."""
+def register_bins(product, quantity, user=None, note="", reserved=False):
+    """Create ``quantity`` fresh codes.
+
+    By default each is a tote on the shelf. With ``reserved=True`` they're
+    codes printed ahead of time: not inventory until a label is put on a tote
+    and scanned in (see ``activate_bin``).
+    """
     created = []
+    status = StockState.RESERVED if reserved else StockState.READY
     for _ in range(quantity):
-        b = Bin.objects.create(product=product, code=new_code(), status=StockState.READY)
+        b = Bin.objects.create(product=product, code=new_code(), status=status)
         BinEvent.objects.create(bin=b, kind=BinEvent.Kind.REGISTERED, by=user, note=note)
         created.append(b)
     return created
@@ -261,6 +267,11 @@ def check_in_bin(code, outcome="good", lid_salvaged=False, user=None):
     if outcome not in OUTCOMES:
         raise BinError("Choose good, broken or lid.")
     b = _get(code)
+    if b.status == StockState.RESERVED:
+        # A new tote with a pre-printed label: scanning it in puts it in service.
+        if outcome != "good":
+            raise BinError(f"{b.code} is a new label; scan it with Good to put the tote in service.")
+        return activate_bin(b.code, user)
     back_unscanned = (b.status == StockState.OUT and b.booking is not None
                       and b.booking.status == Booking.Status.PICKED_UP)
     if back_unscanned:
@@ -373,6 +384,18 @@ def repair_with_spare_lid(code, user=None):
     b.status = StockState.READY
     b.save(update_fields=["status"])
     _event(b, BinEvent.Kind.LID_REPAIRED, user=user)
+    return b
+
+
+@transaction.atomic
+def activate_bin(code, user=None):
+    """A pre-printed label went onto a new tote: it's now on the shelf."""
+    b = _get(code)
+    if b.status != StockState.RESERVED:
+        raise BinError(f"{b.code} is already in service.")
+    b.status = StockState.READY
+    b.save(update_fields=["status"])
+    _event(b, BinEvent.Kind.ACTIVATED, user=user)
     return b
 
 

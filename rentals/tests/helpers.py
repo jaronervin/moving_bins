@@ -25,3 +25,14 @@ def blankets():
     if created:
         PricePoint.objects.create(product=p, quantity=1, unit_rate=Decimal("2.00"))
     return p
+
+
+def assert_redirects_to_booking(test, response, booking, fragment=""):
+    """Booking links carry a timestamp, so compare which booking they open, not the exact text."""
+    from rentals import links
+
+    test.assertEqual(response.status_code, 302)
+    location = response["Location"]
+    test.assertTrue(location.startswith("/b/") and location.endswith("/" + fragment), location)
+    token = location[len("/b/"):].split("/")[0]
+    test.assertEqual(links.read_token(token), booking.reference)

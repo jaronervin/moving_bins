@@ -5,10 +5,11 @@
 <h1>{{ bin.get_status_display }}</h1>
 <p class="muted">{{ bin.product }} · {{ bin.moves }} rental{{ bin.moves|pluralize }} so far
   {% if bin.booking %}· with <a href="{% url 'admin:rentals_booking_change' bin.booking.pk %}">{{ bin.booking.reference }}</a>{% endif %}</p>
-{% if bin.status == "out_of_service" or bin.status == "missing" %}
+{% if bin.status == "out_of_service" or bin.status == "missing" or bin.status == "reserved" %}
 <form method="post">{% csrf_token %}
   {% if bin.status == "out_of_service" %}<button name="action" value="repair">Fit a spare lid</button>{% endif %}
   {% if bin.status == "missing" %}<button name="action" value="found">It's back: send to check-in</button>{% endif %}
+  {% if bin.status == "reserved" %}<button name="action" value="activate">Label is on a tote: put in service</button>{% endif %}
 </form>
 {% endif %}
 <section class="card">

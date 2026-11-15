@@ -138,6 +138,8 @@ def scan_api(request):
             b = bins.check_in_bin(code, data.get("outcome", "good"),
                                   lid_salvaged=bool(data.get("lid_salvaged")), user=request.user)
             label = {"ready": "good", "retired": "broken, retired", "out_of_service": "needs a lid"}[b.status]
+            if b.events.filter(kind="activated").exists() and b.moves == 0:
+                label = "new tote, now in service"
             return JsonResponse({"ok": True, "code": b.code, "message": f"{b.code}: {label}"})
         booking = Booking.objects.get(reference=data.get("reference"))
         actions = {("load", False): bins.load_bin, ("load", True): bins.unload_bin,
@@ -163,6 +165,9 @@ def bin_detail(request, code):
             if action == "repair":
                 bins.repair_with_spare_lid(b.code, request.user)
                 messages.success(request, f"{b.code} has a new lid and is back on the shelf.")
+            elif action == "activate":
+                bins.activate_bin(b.code, request.user)
+                messages.success(request, f"{b.code} is on a tote and in service.")
             elif action == "found":
                 bins.found_bin(b.code, request.user)
                 messages.success(request, f"{b.code} is back; check it in after cleaning.")
