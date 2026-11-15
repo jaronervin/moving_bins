@@ -16,14 +16,15 @@
     <ul class="chips" id="scanned"></ul>
   </section>
   <section class="card">
-    <h2>Waiting ({{ waiting|length }})</h2>
+    <h2>Back, not checked in ({{ waiting|length }})</h2>
     <p class="mono">{% for b in waiting %}{{ b.code }}{% if not forloop.last %} {% endif %}{% empty %}<span class="muted">None</span>{% endfor %}</p>
     <h2>Finish a rental</h2>
     {% for b, prog in bookings %}
       <form method="post" action="{% url 'ops_finish_check_in' b.reference %}">{% csrf_token %}
         <p><b>{{ b.reference }}</b> · {{ b.customer.name }}<br>
-          <span class="muted">{{ prog.0 }} checked, {{ prog.1 }} waiting{% if prog.2 %}, {{ prog.2 }} not returned{% endif %}</span></p>
-        <button type="submit" {% if prog.1 %}disabled{% endif %}>Close rental</button>
+          <span class="muted">{{ prog.0 }} checked in{% if prog.1 %}, {{ prog.1 }} waiting{% endif %}{% if prog.2 %}, {{ prog.2 }} not scanned yet{% endif %}</span></p>
+        <button type="submit" {% if prog.1 %}disabled{% endif %}
+          {% if prog.2 %}onclick="return confirm('{{ prog.2 }} tote{{ prog.2|pluralize }} not scanned will be marked missing and charged. Close anyway?')"{% endif %}>Close rental</button>
       </form>
     {% empty %}<p class="muted">No rentals waiting.</p>{% endfor %}
   </section>

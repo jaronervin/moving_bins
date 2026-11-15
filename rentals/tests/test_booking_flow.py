@@ -4,6 +4,7 @@ Uses the fake maps backend: distances come from a ZIP table in rentals/maps.py
 (21218 → 4 mi, 21401 → 35 mi, 21702 → 55 mi, 21801 → 125 mi).
 """
 
+import re
 from datetime import time, timedelta
 
 from django.core import mail
@@ -66,7 +67,9 @@ class BookingFlowTests(TestCase):
         self.assertContains(page, "$177.05")  # 162.05 + 15.00
 
         self.assertEqual(len(mail.outbox), 2)
-        self.assertIn(links.booking_url(booking, absolute=True), mail.outbox[0].body)
+        # The emailed link opens this booking (links carry a timestamp, so compare what they point to).
+        token = re.search(r"/b/([^/\s]+)/", mail.outbox[0].body).group(1)
+        self.assertEqual(links.read_token(token), booking.reference)
         self.assertEqual(mail.outbox[1].to, ["owner@example.com"])
 
     def test_dropoff_too_far(self):

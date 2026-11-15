@@ -248,3 +248,32 @@ class OpsTests(TestCase):
         self.client.login(username="owner", password="x")
         r = self.client.get(f"/ops/bin/{self.codes[0]}/")
         self.assertContains(r, "Added to inventory")
+
+
+class WarehouseScanTests(TestCase):
+    """Pickup without scanning at the door; totes are scanned at check-in."""
+
+    def test_scan_only_at_check_in(self):
+        codes = [b.code for b in bins.register_bins(bin_product(), 3)]
+        b = rental(qty=3)
+        for c in codes:
+            bins.load_bin(b, c)
+        bins.complete_dropoff(b)
+        self.assertEqual(bins.complete_pickup(b, now=NOW), sorted(codes))  # none scanned
+        self.assertEqual(bins.check_in_progress(b), (0, 0, 3))
+        bins.check_in_bin(codes[0], "good")
+        bins.check_in_bin(codes[1], "broken")
+        self.assertEqual(bins.check_in_progress(b), (2, 0, 1))
+        [summary] = bins.finish_check_in(b, now=NOW + timedelta(days=1))
+        self.assertEqual((summary.good, summary.broken, summary.missing), (1, 1, 1))
+        self.assertEqual(summary.damage_amount, D("20.00"))
+        kinds = list(Bin.objects.get(code=codes[0]).events.values_list("kind", flat=True))
+        self.assertIn("picked_up", kinds)
+
+    def test_cant_check_in_a_tote_still_at_the_renters(self):
+        code = bins.register_bins(bin_product(), 1)[0].code
+        b = rental(qty=1)
+        bins.load_bin(b, code)
+        bins.complete_dropoff(b)
+        with self.assertRaisesMessage(bins.BinError, "isn't waiting for check-in"):
+            bins.check_in_bin(code)

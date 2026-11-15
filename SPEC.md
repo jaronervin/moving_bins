@@ -273,7 +273,9 @@ redirects to the main site with the code kept. Lids aren't labelled.
 - **Load at base:** scan each bin onto the booking; the page shows "19 of 20".
   Dropoff can only be marked done when the count matches and the renter has
   given their moving-in address. Tap a code to undo a scan.
-- **Pickup:** scan bins back. Unscanned bins are listed.
+- **Pickup:** mark done; scanning at the door is optional, since totes are
+  usually stacked and waiting. Totes not scanned there are scanned at check-in
+  back at the warehouse, which also counts as their return.
 - **Check-in after cleaning:** pick Good / Lid missing / Broken (optionally
   "lid still good" → spare), scan. Closing the rental marks any bin never
   scanned at pickup as **missing** and works out the damage charge from the

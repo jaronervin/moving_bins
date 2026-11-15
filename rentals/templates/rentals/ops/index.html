@@ -21,7 +21,7 @@
     <h2>To check in</h2>
     {% for b, prog in picked %}
       <p><a href="{% url 'ops_check_in' %}">{{ b.reference }} · {{ b.customer.name }}</a>
-        <span class="muted">· {{ prog.1 }} waiting{% if prog.2 %}, {{ prog.2 }} not returned{% endif %}</span></p>
+        <span class="muted">· {{ prog.0 }} checked in, {{ prog.1|add:prog.2 }} to go</span></p>
     {% empty %}<p class="muted">Nothing waiting.</p>{% endfor %}
   </section>
   <section class="card">

@@ -19,7 +19,8 @@
       <input type="hidden" name="action" value="finish">
       <button type="submit">{% if mode == "load" %}Dropoff done{% else %}Pickup done{% endif %}</button>
     </form>
-    {% if mode == "pickup" %}<p class="muted">Any tote not scanned is reported as not returned at check-in.</p>{% endif %}
+    {% if mode == "pickup" %}<p class="muted">Scanning here is optional: you can mark the pickup done and scan
+      the totes at check-in back at the warehouse.</p>{% endif %}
   </section>
 </div>
 <script>window.SCAN = {mode: "{{ mode }}", reference: "{{ booking.reference }}", api: "{% url 'ops_scan_api' %}"};</script>

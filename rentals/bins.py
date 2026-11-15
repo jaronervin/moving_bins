@@ -3,13 +3,14 @@ Individually tracked bins: label codes and everything that happens to a bin.
 
 The life of a bin:
 
-    ready ──load──► out ──pickup scan──► awaiting_check_in ──check-in──► ready
+    ready ──load──► out ──pickup scan (optional)──► awaiting_check_in ──check-in──► ready
+                     └──────────── or straight to check-in at the warehouse ─────┘
                      │                                         ├─broken──► retired
                      │                                         └─lid─────► out_of_service ──spare lid──► ready
                      └── not picked up when check-in is finished ──► missing ──found──► awaiting_check_in
 
-Owners scan bins at base while loading (assigns them to the booking), scan
-them again at pickup, then check each in after cleaning. Every step writes a
+Owners scan bins at base while loading (assigns them to the booking), may
+scan them at pickup (optional), then check each in back at the warehouse. Every step writes a
 BinEvent, and the bin's ``status`` is the source of truth for counts.
 """
 
@@ -260,7 +261,12 @@ def check_in_bin(code, outcome="good", lid_salvaged=False, user=None):
     if outcome not in OUTCOMES:
         raise BinError("Choose good, broken or lid.")
     b = _get(code)
-    if b.status != StockState.AWAITING_CHECK_IN:
+    back_unscanned = (b.status == StockState.OUT and b.booking is not None
+                      and b.booking.status == Booking.Status.PICKED_UP)
+    if back_unscanned:
+        # Picked up without scanning at the door: this scan is its return.
+        _event(b, BinEvent.Kind.PICKED_UP, b.booking, user, note="Scanned at check-in")
+    elif b.status != StockState.AWAITING_CHECK_IN:
         raise BinError(f"{b.code} isn't waiting for check-in ({b.get_status_display().lower()}).")
     status, kind = OUTCOMES[outcome]
     booking = b.booking
@@ -275,7 +281,12 @@ def check_in_bin(code, outcome="good", lid_salvaged=False, user=None):
 
 
 def check_in_progress(booking):
-    """(checked, waiting, not_returned) bin counts for one booking."""
+    """(checked, waiting, not_scanned) bin counts for one booking.
+
+    ``waiting`` = scanned at pickup but not yet checked in; ``not_scanned`` =
+    not scanned since dropoff (normal if you scan at the warehouse; any still
+    unscanned when the rental is closed are marked missing).
+    """
     waiting = Bin.objects.filter(booking=booking, status=StockState.AWAITING_CHECK_IN).count()
     not_returned = loaded(booking).count()
     checked = BinEvent.objects.filter(booking=booking, kind__in=[k for _, k in OUTCOMES.values()]).count()

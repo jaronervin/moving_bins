@@ -66,8 +66,8 @@ def scanner(request, reference, mode):
                 bins.complete_dropoff(booking, request.user)
                 messages.success(request, f"Dropoff for {booking.reference} marked done.")
             else:
-                missing = bins.complete_pickup(booking, request.user)
-                note = f" Not scanned: {', '.join(missing)}." if missing else ""
+                unscanned = bins.complete_pickup(booking, request.user)
+                note = f" Scan the {len(unscanned)} remaining totes at check-in." if unscanned else ""
                 messages.success(request, f"Pickup for {booking.reference} marked done.{note}")
             return redirect("ops_index")
         except bins.BinError as exc:
@@ -91,7 +91,10 @@ def _scan_state(booking, mode):
 
 @staff_required
 def check_in(request):
-    waiting = (Bin.objects.filter(status=StockState.AWAITING_CHECK_IN)
+    from django.db.models import Q
+
+    waiting = (Bin.objects.filter(Q(status=StockState.AWAITING_CHECK_IN)
+                                  | Q(status=StockState.OUT, booking__status=Booking.Status.PICKED_UP))
                .select_related("booking").order_by("booking__reference", "code"))
     ready_to_finish = [
         (b, bins.check_in_progress(b))
