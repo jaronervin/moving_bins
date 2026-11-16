@@ -1,1 +1,1 @@
-We got your bin request ({{ booking.reference }})
+{% autoescape off %}{% if booking.status == "confirmed" %}You're booked! Sprout Tote Co. {{ booking.reference }}{% else %}We got your tote request ({{ booking.reference }}){% endif %}{% endautoescape %}

@@ -11,8 +11,8 @@ from django.core import mail
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from rentals import inventory, links
-from rentals.models import Booking, TimeWindow, Visit
+from rentals import inventory, links, services
+from rentals.models import Booking, BusinessSettings, TimeWindow, Visit
 
 from .helpers import assert_redirects_to_booking, bins
 
@@ -54,7 +54,12 @@ class BookingFlowTests(TestCase):
 
         r = self.walk()
         booking = Booking.objects.get()
-        self.assertEqual(booking.status, Booking.Status.REQUESTED)
+        # Auto-confirmed with the renter's chosen windows; owners have 24h to decline.
+        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
+        self.assertIsNone(booking.hold_expires_at)
+        self.assertAlmostEqual((booking.review_until - timezone.now()).total_seconds(), 24 * 3600, delta=60)
+        self.assertEqual(booking.visits.get(kind="dropoff").window, self.drop_window)
+        self.assertEqual(booking.visits.get(kind="dropoff").status, "confirmed")
         self.assertEqual(booking.lines.get().quantity, 35)
         self.assertEqual((booking.dropoff_miles, booking.pickup_miles), (4, 35))
         self.assertEqual(str(booking.pickup_fee), "15.00")  # 5 miles × $3
@@ -165,3 +170,76 @@ class MinimumNoticeTests(TestCase):
         soon = timezone.localdate() + timedelta(days=2)
         r = self.client.post("/book/", {"quantity": 20, "dropoff_date": soon.isoformat(), "weeks": 1})
         self.assertContains(r, "We need a few days")
+
+
+
+@override_settings(MAPS_BACKEND="fake", OWNER_EMAILS=["owner@example.com"])
+class AutoConfirmTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+
+        inventory.record_purchase(bins(), 100)
+        self.dropoff = timezone.localdate() + timedelta(days=10)
+        self.drop_window = TimeWindow.objects.create(date=self.dropoff, start=time(8), end=time(10))
+        self.pick_window = TimeWindow.objects.create(date=self.dropoff + timedelta(days=7),
+                                                     start=time(8), end=time(10))
+        User.objects.create_user("owner", password="x", is_staff=True)
+
+    def book(self, qty=40):
+        self.client.post("/book/", {"quantity": qty, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
+        self.client.post("/book/addresses/", {**address("dropoff"), "pickup-unknown": "on"})
+        self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk,
+                                          "pickup_window": self.pick_window.pk})
+        self.client.post("/book/contact/", {"name": "Pat", "email": "pat@example.com", "phone": "1"})
+        self.client.post("/book/review/")
+        return Booking.objects.latest("id")
+
+    def test_renter_sees_confirmed(self):
+        booking = self.book()
+        self.assertIn("You're booked", mail.outbox[0].subject)
+        self.assertIn("to decline, do it by", mail.outbox[1].body.lower())
+        self.assertContains(self.client.get(links.booking_url(booking)), "You're booked!")
+
+    def test_owner_declines_within_window(self):
+        booking = self.book(qty=100)
+        self.assertEqual(inventory.available(bins(), self.dropoff, self.dropoff + timedelta(days=7)), 0)
+        self.client.login(username="owner", password="x")
+        self.assertContains(self.client.get("/ops/"), "you can still decline")
+        r = self.client.post(f"/ops/b/{booking.reference}/decline", {"reason": "We're fully booked."},
+                             follow=True)
+        self.assertContains(r, "declined")
+        booking.refresh_from_db()
+        self.assertEqual((booking.status, booking.decline_reason), ("declined", "We're fully booked."))
+        self.assertEqual(inventory.available(bins(), self.dropoff, self.dropoff + timedelta(days=7)), 100)
+        self.assertIn("cancelled", mail.outbox[-1].subject)
+        self.assertIn("We're fully booked.", mail.outbox[-1].body)
+        self.assertEqual(booking.visits.filter(status="cancelled").count(), 2)
+
+    def test_cannot_decline_after_window(self):
+        booking = self.book()
+        with self.assertRaisesMessage(services.CannotDecline, "has passed"):
+            services.decline_booking(booking, "late", now=timezone.now() + timedelta(hours=25))
+
+    def test_manual_approval_still_available(self):
+        settings = BusinessSettings.load()
+        settings.auto_confirm = False
+        settings.save()
+        booking = self.book()
+        self.assertEqual(booking.status, Booking.Status.REQUESTED)
+        self.assertIn("We got your tote request", mail.outbox[0].subject)
+
+
+class EmailEscapingTests(TestCase):
+    def test_plain_text_emails_are_not_html_escaped(self):
+        from django.template.loader import render_to_string
+
+        class B:  # just enough of a booking for the template
+            reference = "MB-TEST01"
+            decline_reason = "We're fully booked & can't fit you in."
+            dropoff_date = timezone.localdate()
+
+            class customer:
+                name = "Pat O'Brien"
+        body = render_to_string("rentals/email/declined_body.txt", {"booking": B, "site_url": "x"})
+        self.assertIn("Pat O'Brien", body)
+        self.assertIn("We're fully booked & can't fit you in.", body)

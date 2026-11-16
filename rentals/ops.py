@@ -41,8 +41,11 @@ def index(request):
                .select_related("customer").order_by("dropoff_date"))
     out = Booking.objects.filter(status=Booking.Status.OUT).select_related("customer").order_by("pickup_date")
     picked = Booking.objects.filter(status=Booking.Status.PICKED_UP).select_related("customer")
+    reviewable = (Booking.objects.filter(status=Booking.Status.CONFIRMED, review_until__gt=timezone.now())
+                  .select_related("customer", "dropoff_address", "pickup_address").order_by("review_until"))
     products = Product.objects.filter(is_serialized=True)
     return render(request, "rentals/ops/index.html", {
+        "reviewable": reviewable,
         "to_load": [(b, bins.load_progress(b)) for b in to_load],
         "out": [(b, bins.loaded(b).count()) for b in out],
         "picked": [(b, bins.check_in_progress(b)) for b in picked],
@@ -202,3 +205,20 @@ def labels(request):
     return render(request, "rentals/ops/labels.html", {
         "items": items, "copies": copies, "domain": settings.QR_BASE_URL.split("//")[-1].split("/")[0].lower(),
     })
+
+
+@staff_required
+@require_POST
+def decline(request, reference):
+    """Decline an auto-confirmed booking within the review window."""
+    from . import emails, services
+
+    booking = _booking(reference)
+    reason = request.POST.get("reason", "").strip()
+    try:
+        services.decline_booking(booking, reason)
+        emails.booking_declined(booking)
+        messages.success(request, f"{booking.reference} declined; {booking.customer.name} has been emailed.")
+    except services.CannotDecline as exc:
+        messages.error(request, str(exc))
+    return redirect("ops_index")

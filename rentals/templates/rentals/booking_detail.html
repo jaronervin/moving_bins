@@ -6,6 +6,11 @@
 {% if booking.status == "requested" %}
   <p class="lede">We're holding your bins and will confirm your times by
     {{ booking.hold_expires_at|date:"l, M j \a\t g:i A" }}.</p>
+{% elif booking.status == "confirmed" %}
+  <p class="lede">You're booked! We'll see you {{ booking.dropoff_date|date:"l, M j" }}.</p>
+{% elif booking.status == "declined" %}
+  <p class="lede">We're sorry, we couldn't take this booking.{% if booking.decline_reason %} {{ booking.decline_reason }}{% endif %}
+    Nothing was charged. <a href="{% url 'book_dates' %}">Book different dates</a>.</p>
 {% endif %}
 
 {% if pickup_form and not booking.pickup_address %}

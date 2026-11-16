@@ -1,1 +1,1 @@
-New request {{ booking.reference }}: {% for line in booking.lines.all %}{{ line.quantity }} bins{% endfor %}, {{ booking.dropoff_date|date:"D M j" }}
+{% autoescape off %}{% if booking.status == "confirmed" %}New booking{% else %}New request{% endif %} {{ booking.reference }}: {% for line in booking.lines.all %}{{ line.quantity }} bins{% endfor %}, {{ booking.dropoff_date|date:"D M j" }}{% endautoescape %}

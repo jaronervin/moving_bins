@@ -23,5 +23,6 @@ urlpatterns = [
     path("ops/check-in/", ops.check_in, name="ops_check_in"),
     path("ops/b/<str:reference>/finish-check-in", ops.finish_check_in_view, name="ops_finish_check_in"),
     path("ops/api/scan", ops.scan_api, name="ops_scan_api"),
+    path("ops/b/<str:reference>/decline", ops.decline, name="ops_decline"),
     path("ops/labels/", ops.labels, name="ops_labels"),
 ]

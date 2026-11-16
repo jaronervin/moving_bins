@@ -1,1 +1,1 @@
-Your Sprout Tote Co. booking link{{ links|length|pluralize }}
+{% autoescape off %}Your Sprout Tote Co. booking link{{ links|length|pluralize }}{% endautoescape %}

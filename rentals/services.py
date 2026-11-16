@@ -183,6 +183,60 @@ def submit_booking(draft, now=None):
 
     Visit.objects.create(booking=booking, kind=Visit.Kind.DROPOFF, requested_window=dropoff_window)
     Visit.objects.create(booking=booking, kind=Visit.Kind.PICKUP, requested_window=pickup_window)
+    if BusinessSettings.load().auto_confirm:
+        confirm_booking(booking, now=now)
+    return booking
+
+
+def confirm_booking(booking, now=None):
+    """Confirm with the renter's chosen windows.
+
+    When this happens automatically at submit, the owners can still decline
+    within ``review_hours`` (see ``decline_booking``).
+    """
+    from .models import Visit
+
+    now = now or timezone.now()
+    for visit in booking.visits.all():
+        visit.window = visit.window or visit.proposed_window or visit.requested_window
+        visit.status = Visit.Status.CONFIRMED
+        visit.save(update_fields=["window", "status"])
+    booking.status = Booking.Status.CONFIRMED
+    booking.hold_expires_at = None
+    booking.review_until = now + timedelta(hours=BusinessSettings.load().review_hours)
+    booking.save()
+    return booking
+
+
+class CannotDecline(Exception):
+    pass
+
+
+@transaction.atomic
+def decline_booking(booking, reason, now=None):
+    """Owners turn down an auto-confirmed booking within the review window.
+
+    Nothing has been charged yet (cards are charged at dropoff), so the renter
+    owes nothing. Any totes already scanned onto the load go back on the shelf.
+    """
+    from .models import Bin, BinEvent, StockState, Visit
+
+    now = now or timezone.now()
+    if booking.status != Booking.Status.CONFIRMED:
+        raise CannotDecline(f"{booking.reference} is {booking.get_status_display().lower()}.")
+    if booking.review_until is None or now > booking.review_until:
+        raise CannotDecline(f"The {BusinessSettings.load().review_hours}-hour window to decline "
+                            f"{booking.reference} has passed. Contact the renter to change or cancel it.")
+    for b in Bin.objects.select_for_update().filter(booking=booking, status=StockState.OUT):
+        b.status, b.booking = StockState.READY, None
+        b.save(update_fields=["status", "booking"])
+        BinEvent.objects.create(bin=b, kind=BinEvent.Kind.UNLOADED, booking=booking,
+                                note="Booking declined")
+    booking.visits.update(status=Visit.Status.CANCELLED)
+    booking.status = Booking.Status.DECLINED
+    booking.decline_reason = reason.strip()
+    booking.cancelled_at = now
+    booking.save()
     return booking
 
 

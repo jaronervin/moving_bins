@@ -152,18 +152,22 @@ set per line item.
    verification (AVS).
 6. **Sign** — read the agreement, tick the box, type full name. Typed name
    must match the name on the payment method (ignoring case/spacing).
-7. **Submitted** — status `requested`. Bins are **held for 48 hours** so
-   nobody else can book them. Renter gets a confirmation email with a
-   private link to view, change or cancel the booking.
+7. **Booked**: status `confirmed` right away (auto-confirm, §3.2). Renter
+   gets a "You're booked" email with a private link to view, change or
+   cancel the booking.
 
 ### 3.2 Owner response
-- **Accept** both windows → status `confirmed`. Nothing is charged yet
-  (§6.1). Renter is emailed a confirmation.
-- **Propose** different window(s) → status `times_proposed` → renter gets an
-  email to accept or decline. Accepting confirms.
-- No owner action within 48h, or no renter answer within 48h of a proposal
-  → hold expires, renter is emailed, nothing is charged.
-- Confirmed times and addresses can still be adjusted later by either side.
+
+**Auto-confirm (default):** a submitted booking is **confirmed immediately**
+with the windows the renter chose, so renters never wait on "pending
+approval". The owners get an email and have **24 hours to decline**
+(setting) from the owner page, with a short reason emailed to the renter.
+Nothing has been charged yet, so a decline costs the renter nothing. After 24
+hours, changes happen by agreement with the renter like any confirmed booking.
+
+**Manual approval (setting off):** the original flow. The request holds the
+bins for 48 hours while the owners accept, or propose other windows for the
+renter to accept. No answer in time → the hold expires.
 
 ### 3.3 Renter's private link
 Emailed links carry a signed, expiring token tied to the booking — no

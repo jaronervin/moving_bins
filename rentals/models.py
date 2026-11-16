@@ -64,6 +64,14 @@ class BusinessSettings(models.Model):
     min_notice_days = models.PositiveIntegerField(
         default=3, help_text="Earliest dropoff a renter can book, in days from today."
     )
+    auto_confirm = models.BooleanField(
+        default=True,
+        help_text="Confirm bookings as soon as they're submitted, with the times the renter chose. "
+        "Untick to approve each request by hand.",
+    )
+    review_hours = models.PositiveIntegerField(
+        default=24, help_text="With auto-confirm: how long after booking you can still decline it."
+    )
     hold_hours = models.PositiveIntegerField(
         default=48, help_text="How long a request holds bins while awaiting a response."
     )
@@ -392,6 +400,7 @@ class Booking(models.Model):
         CLOSED = "closed", "Closed"
         CANCELLED = "cancelled", "Cancelled"
         EXPIRED = "expired", "Expired (no response)"
+        DECLINED = "declined", "Declined by us"
 
     # Statuses that hold bins whatever the clock says.
     COMMITTED_STATUSES = [Status.CONFIRMED, Status.OUT]
@@ -426,6 +435,10 @@ class Booking(models.Model):
     access_notes = models.TextField(blank=True, help_text="Porch, gate codes, etc.")
 
     hold_expires_at = models.DateTimeField(null=True, blank=True)
+    review_until = models.DateTimeField(
+        null=True, blank=True, help_text="Auto-confirmed bookings can be declined until this time."
+    )
+    decline_reason = models.CharField(max_length=500, blank=True)
     stripe_payment_method_id = models.CharField(max_length=64, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -59,7 +59,8 @@ def _dates(draft):
 def _render(request, step, template, context):
     draft = _draft(request)
     done = {name for name, key in _KEY_SET_BY.items() if key in draft}
-    context.update({"steps": STEPS, "step": step, "done": done, "draft": draft})
+    context.update({"steps": STEPS, "step": step, "done": done, "draft": draft,
+                    "auto_confirm": BusinessSettings.load().auto_confirm})
     return render(request, template, context)
 
 
@@ -233,7 +234,10 @@ def review(request):
             return redirect("book_addresses")
         del request.session[SESSION_KEY]
         emails.booking_requested(booking)
-        messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
+        if booking.status == booking.Status.CONFIRMED:
+            messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
+        else:
+            messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
         return redirect(booking_url(booking))
 
     quote = services.quote([(product, draft["quantity"])], draft["weeks"],

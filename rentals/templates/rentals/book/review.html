@@ -32,7 +32,7 @@
     <p class="muted">Nothing is charged now. Your card is charged when the bins are dropped off.</p>
     <p class="note">Coming soon: saving your card and signing the rental agreement happen here.</p>
     <form method="post">{% csrf_token %}
-      <button type="submit">Send request</button>
+      <button type="submit">{% if settings.auto_confirm %}Book now{% else %}Send request{% endif %}</button>
     </form>
     <p class="muted"><a href="{% url 'book_start_over' %}">Start over</a></p>
   </section>

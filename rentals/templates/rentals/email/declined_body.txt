@@ -1,0 +1,11 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+We're sorry, but we can't take booking {{ booking.reference }}
+(dropoff {{ booking.dropoff_date|date:"l, F j" }}).
+{% if booking.decline_reason %}
+{{ booking.decline_reason }}
+{% endif %}
+Nothing was charged, and you don't owe anything.
+
+If you'd like to try different dates, you're welcome to book again:
+{{ site_url }}/book/{% endautoescape %}

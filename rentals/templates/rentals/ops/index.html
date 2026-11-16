@@ -10,6 +10,25 @@
     {% else %}Order by <b>{{ need.order_by|date:"D M j" }}</b>.{% endif %}</p>
 </section>
 {% endfor %}
+{% if reviewable %}
+<section class="card">
+  <h2>New bookings (you can still decline)</h2>
+  {% for b in reviewable %}
+    <details class="review">
+      <summary><b>{{ b.reference }}</b> · {{ b.customer.name }} ·
+        {% for line in b.lines.all %}{{ line.quantity }} totes{% endfor %} · dropoff {{ b.dropoff_date|date:"D M j" }}
+        <span class="muted">· decline by {{ b.review_until|date:"D g:i A" }}</span></summary>
+      <p class="muted">{{ b.dropoff_address }} → {% if b.pickup_address %}{{ b.pickup_address }}{% else %}moving-in address not given yet{% endif %}</p>
+      <form method="post" action="{% url 'ops_decline' b.reference %}"
+            onsubmit="return confirm('Decline {{ b.reference }} and email {{ b.customer.name|escapejs }}?')">{% csrf_token %}
+        <label for="reason-{{ b.pk }}">Reason (sent to the renter)</label>
+        <textarea id="reason-{{ b.pk }}" name="reason" rows="2" placeholder="e.g. We're fully booked for those dates."></textarea>
+        <button type="submit" class="danger">Decline booking</button>
+      </form>
+    </details>
+  {% endfor %}
+</section>
+{% endif %}
 <div class="grid">
   <section class="card">
     <h2>To load (next 14 days)</h2>

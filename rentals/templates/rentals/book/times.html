@@ -21,7 +21,7 @@
       {{ form.pickup_window.errors }}{{ form.pickup_window }}
     </section>
   </div>
-  <p class="muted">These are requests. We'll confirm within 48 hours or suggest another time.
+  <p class="muted">{% if auto_confirm %}Your booking is confirmed for the times you pick.{% else %}These are requests. We'll confirm within 48 hours or suggest another time.{% endif %}
     You don't need to be home; we can leave bins on a porch.</p>
   <button type="submit" class="narrow">Continue</button>
 </form>
