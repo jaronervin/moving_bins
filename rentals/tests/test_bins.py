@@ -331,3 +331,22 @@ class StickerExportTests(TestCase):
             self.assertEqual([r["code"] for r in rows], codes)
             self.assertEqual(rows[0]["qr_content"], settings.QR_BASE_URL + codes[0])
             self.assertEqual(rows[0]["quantity"], "3")
+
+
+class StickerEpsTests(TestCase):
+    def test_exact_size_eps_without_fonts(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from rentals import stickers
+
+        if not shutil.which("pdftops"):
+            self.skipTest("pdftops not installed")
+        with tempfile.TemporaryDirectory() as tmp:
+            files = stickers.write_eps(["K7Q", "2CH"], tmp)
+            self.assertEqual([f.name for f in files], ["K7Q.eps", "2CH.eps"])
+            text = Path(files[0]).read_text(errors="ignore")
+            self.assertIn("%%BoundingBox: 0 0 144 144", text)  # exactly 2" x 2"
+            self.assertNotIn("Helvetica", text)
+            self.assertNotIn("/FontName", text)  # text is outlines, no fonts needed
