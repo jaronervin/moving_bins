@@ -15,8 +15,10 @@ boxes that fall apart and get thrown away; each bin can serve hundreds of
 moves before being recycled. The site should say so, and show the running
 impact (see §5.1).
 
-**v1 scope:** one product (a standard bin **with its lid**, rented as a set),
-100 in stock to start.
+**v1 scope:** one product (a standard bin **with its lid**, rented as a set).
+Launch plan: **own 60, take bookings as if 120** (planned capacity), and buy
+more from Costco (about 3 business days) when bookings call for it. 150
+unique codes are printed up front; unused ones stay reserved.
 **Designed for later:** more bin sizes, hand trucks, dollies, blankets.
 The data model treats every rentable thing as a *product* with its own
 stock and pricing, so adding one is data entry, not new code.
@@ -179,8 +181,13 @@ for that address's bookings.
 - A booking occupies its quantity **from dropoff date through pickup date,
   inclusive**. Statuses that occupy stock: `requested`, `times_proposed`
   (while the hold is live), `confirmed`, `out`, `renewed`.
-- **Available(product, start, end)** = stock − the *peak* daily quantity
-  booked on any day in that range. For future dates this *assumes* bins
+- **Available(product, start, end)** = bookable capacity − the *peak* daily
+  quantity booked on any day in that range. Bookable capacity = what you own,
+  or the product's **planned capacity** if higher.
+- **Buy-more warning:** when bookings on any upcoming day exceed what you
+  actually own, the owner page and the new-request email say how many to buy
+  and the date to order by (first short day − purchase lead time, default 5
+  days: 3 business days delivery plus time to sticker). For future dates this *assumes* bins
   come back on their pickup date and pass check-in (no buffer day).
 
 ### 4.1 Unit states

@@ -83,6 +83,11 @@ class BusinessSettings(models.Model):
     contents_retention_days = models.PositiveIntegerField(
         default=30, help_text="Renters' tote contents notes are deleted this long after pickup."
     )
+    purchase_lead_days = models.PositiveIntegerField(
+        default=5,
+        help_text="Days from ordering more totes to having them labelled and ready "
+        "(supplier delivery plus time to sticker them).",
+    )
     vehicle_capacity = models.PositiveIntegerField(
         default=100, help_text="Bin sets that fit in one trip."
     )
@@ -144,6 +149,12 @@ class Product(models.Model):
         null=True,
         blank=True,
         help_text="Charged per lid lost or broken (leave blank if no lid).",
+    )
+    planned_capacity = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Take bookings as if you own this many, and buy more as bookings come in. "
+        "Blank = only what you actually own.",
     )
     spare_lid_product = models.ForeignKey(
         "self",

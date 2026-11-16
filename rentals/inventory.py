@@ -95,15 +95,46 @@ def booked_by_day(product, start, end, now=None, exclude_booking=None):
     return days
 
 
+def bookable_capacity(product):
+    """How many units bookings are taken against: what you own, or the planned
+    capacity if that's higher (you buy more as bookings come in)."""
+    return max(rentable_fleet(product), product.planned_capacity or 0)
+
+
 def available(product, start, end, now=None, exclude_booking=None):
     """How many units of ``product`` can still be booked for the whole range.
 
-    = rentable fleet − the busiest day's bookings in the range.
+    = bookable capacity − the busiest day's bookings in the range.
     ``exclude_booking`` leaves one booking out, used when re-checking a change
     to that booking.
     """
     busiest = max(booked_by_day(product, start, end, now, exclude_booking).values(), default=0)
-    return max(0, rentable_fleet(product) - busiest)
+    return max(0, bookable_capacity(product) - busiest)
+
+
+def purchase_needs(product, today=None, horizon_days=120, now=None):
+    """When bookings outgrow what you actually own: how many to buy, and by when.
+
+    Returns None if nothing is short, else a dict with ``short`` (most units
+    missing on any day), ``first_date`` (first day short), ``order_by``
+    (first_date minus the purchase lead time) and ``owned``.
+    """
+    today = today or timezone.localdate()
+    owned = rentable_fleet(product)
+    days = booked_by_day(product, today, today + timedelta(days=horizon_days), now)
+    short_days = {d: n - owned for d, n in days.items() if n > owned}
+    if not short_days:
+        return None
+    first = min(short_days)
+    lead = BusinessSettings.load().purchase_lead_days
+    return {
+        "product": product,
+        "short": max(short_days.values()),
+        "first_date": first,
+        "order_by": first - timedelta(days=lead),
+        "late": first - timedelta(days=lead) < today,
+        "owned": owned,
+    }
 
 
 def ready_shortfalls(product, today=None, horizon_days=7):

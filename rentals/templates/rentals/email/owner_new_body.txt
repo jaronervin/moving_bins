@@ -7,4 +7,7 @@ Dropoff {{ booking.dropoff_date|date:"D M j" }} — {{ booking.dropoff_address }
 {% endfor %}Pickup  {{ booking.pickup_date|date:"D M j" }} — {% if booking.pickup_address %}{{ booking.pickup_address }} ({{ booking.pickup_miles }} mi, fee ${{ booking.pickup_fee }}){% else %}ADDRESS NOT GIVEN YET{% endif %}
 
 Hold expires {{ booking.hold_expires_at|date:"D M j, g:i A" }}.
+{% for need in needs %}
+BUY MORE: with this request, bookings need {{ need.short }} more {{ need.product }} than you own ({{ need.owned }}), first on {{ need.first_date|date:"D M j" }}. {% if need.late %}Order now; that's inside your {{ lead_days }}-day lead time.{% else %}Order by {{ need.order_by|date:"D M j" }}.{% endif %}
+{% endfor %}
 Respond: {{ admin_link }}

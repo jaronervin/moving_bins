@@ -71,6 +71,22 @@ class BookingFlowTests(TestCase):
         token = re.search(r"/b/([^/\s]+)/", mail.outbox[0].body).group(1)
         self.assertEqual(links.read_token(token), booking.reference)
         self.assertEqual(mail.outbox[1].to, ["owner@example.com"])
+        self.assertNotIn("BUY MORE", mail.outbox[1].body)
+
+    def test_owner_email_says_when_to_buy_more(self):
+        product = bins()
+        product.planned_capacity = 150
+        product.save()  # own 100 (setUp), booking against 150
+        TimeWindow.objects.filter(pk=self.drop_window.pk).update(max_stops=3)
+        self.client.post("/book/", {"quantity": 120, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
+        self.client.post("/book/addresses/", {**address("dropoff"), "pickup-unknown": "on"})
+        self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk,
+                                          "pickup_window": self.pick_window.pk})
+        self.client.post("/book/contact/", {"name": "Big Move", "email": "big@example.com", "phone": "1"})
+        self.client.post("/book/review/")
+        owner_mail = mail.outbox[1].body
+        self.assertIn("BUY MORE", owner_mail)
+        self.assertIn("20 more", owner_mail)
 
     def test_dropoff_too_far(self):
         self.client.post("/book/", {"quantity": 20, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})

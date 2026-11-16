@@ -157,3 +157,51 @@ class AvailabilityTests(TestCase):
         self._out_of_service(10)
         warnings = inventory.ready_shortfalls(self.bins, today=date(2027, 1, 1))
         self.assertEqual(warnings, [(date(2027, 1, 4), 100, 90)])
+
+
+class PlannedCapacityTests(TestCase):
+    """Own 60, take bookings as if 120, and get told when to buy more."""
+
+    def setUp(self):
+        self.bins = bins()
+        inventory.record_purchase(self.bins, 60)
+        self.bins.planned_capacity = 120
+        self.bins.save()
+        self.today = date(2027, 1, 1)
+
+    def hold(self, qty, dropoff):
+        return services.place_hold(make_booking(dropoff=dropoff), [(self.bins, qty)], now=NOW)
+
+    def test_books_against_planned_capacity(self):
+        self.assertEqual(inventory.available(self.bins, date(2027, 1, 9), date(2027, 1, 16), now=NOW), 120)
+        self.hold(70, date(2027, 1, 9))
+        self.assertEqual(inventory.available(self.bins, date(2027, 1, 9), date(2027, 1, 16), now=NOW), 50)
+        with self.assertRaises(services.NotEnoughStock):
+            self.hold(51, date(2027, 1, 12))
+
+    def test_no_purchase_needed_within_what_you_own(self):
+        self.hold(60, date(2027, 1, 9))
+        self.assertIsNone(inventory.purchase_needs(self.bins, today=self.today, now=NOW))
+
+    def test_purchase_needed_with_order_by_date(self):
+        self.hold(40, date(2027, 1, 9))
+        self.hold(45, date(2027, 1, 14))  # overlaps Jan 14-16: 85 out
+        need = inventory.purchase_needs(self.bins, today=self.today, now=NOW)
+        self.assertEqual((need["short"], need["first_date"], need["owned"]), (25, date(2027, 1, 14), 60))
+        self.assertEqual(need["order_by"], date(2027, 1, 9))  # 5-day lead time
+        self.assertFalse(need["late"])
+        late = inventory.purchase_needs(self.bins, today=date(2027, 1, 12), now=NOW)
+        self.assertTrue(late["late"])
+
+    def test_blank_planned_capacity_means_owned_only(self):
+        self.bins.planned_capacity = None
+        self.bins.save()
+        self.assertEqual(inventory.available(self.bins, date(2027, 1, 9), date(2027, 1, 16), now=NOW), 60)
+
+    def test_owner_page_shows_buy_more(self):
+        from django.contrib.auth.models import User
+
+        self.hold(80, date(2027, 1, 9))
+        User.objects.create_user("owner", password="x", is_staff=True)
+        self.client.login(username="owner", password="x")
+        self.assertContains(self.client.get("/ops/"), "Buy 20 more")

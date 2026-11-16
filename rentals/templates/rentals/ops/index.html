@@ -1,6 +1,15 @@
 {% extends "rentals/ops/_base.html" %}
 {% block ops %}
 <h1>Owner tools</h1>
+{% for need in buy %}
+<section class="card attention">
+  <h2>Buy {{ need.short }} more {{ need.product }}{{ need.short|pluralize }}</h2>
+  <p>Bookings need up to {{ need.owned|add:need.short }} on some days; you own {{ need.owned }}.
+    First short day: <b>{{ need.first_date|date:"D M j" }}</b>.
+    {% if need.late %}<b>Order now</b>: that's inside your {{ settings.purchase_lead_days }}-day lead time.
+    {% else %}Order by <b>{{ need.order_by|date:"D M j" }}</b>.{% endif %}</p>
+</section>
+{% endfor %}
 <div class="grid">
   <section class="card">
     <h2>To load (next 14 days)</h2>

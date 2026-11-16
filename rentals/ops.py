@@ -26,7 +26,7 @@ from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
 from . import bins, inventory
-from .models import Bin, Booking, Product, StockState
+from .models import Bin, Booking, BusinessSettings, Product, StockState
 
 staff_required = user_passes_test(lambda u: u.is_active and u.is_staff)
 
@@ -47,7 +47,9 @@ def index(request):
         "out": [(b, bins.loaded(b).count()) for b in out],
         "picked": [(b, bins.check_in_progress(b)) for b in picked],
         "stock": [(p, inventory.counts(p)) for p in products],
+        "buy": [n for n in (inventory.purchase_needs(p) for p in products) if n],
         "states": StockState,
+        "settings": BusinessSettings.load(),
     })
 
 

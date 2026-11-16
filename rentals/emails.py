@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
+from .models import BusinessSettings
+
 from .links import booking_url
 
 
@@ -19,9 +21,15 @@ def booking_requested(booking):
     _send([booking.customer.email], "rentals/email/requested_subject.txt",
           "rentals/email/requested_body.txt", context)
     if settings.OWNER_EMAILS:
+        from . import inventory
+
         admin_link = f"{settings.SITE_URL}/admin/rentals/booking/{booking.pk}/change/"
+        needs = [n for n in (inventory.purchase_needs(line.product)
+                             for line in booking.lines.select_related("product")) if n]
         _send(settings.OWNER_EMAILS, "rentals/email/owner_new_subject.txt",
-              "rentals/email/owner_new_body.txt", {**context, "admin_link": admin_link})
+              "rentals/email/owner_new_body.txt",
+              {**context, "admin_link": admin_link, "needs": needs,
+               "lead_days": BusinessSettings.load().purchase_lead_days})
 
 
 def booking_links(email, bookings):

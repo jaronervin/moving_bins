@@ -34,7 +34,8 @@ class BusinessSettingsAdmin(admin.ModelAdmin):
         ("Holds, cancellation, payment", {"fields": ["min_notice_days", "hold_hours", "cancel_cutoff_hours",
                                                      "late_cancel_charge_percent",
                                                      "authorize_hours_before_dropoff"]}),
-        ("Operations", {"fields": ["check_in_deadline_days", "vehicle_capacity", "boxes_per_bin"]}),
+        ("Operations", {"fields": ["check_in_deadline_days", "purchase_lead_days", "vehicle_capacity",
+                                    "boxes_per_bin", "contents_retention_days"]}),
     ]
 
     def has_add_permission(self, request):
