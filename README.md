@@ -71,6 +71,7 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/admin.py` | Owner back office |
 | `rentals/management/commands/daily_tasks.py` | Run once a day: expire holds, add windows, delete old tote notes |
 | `rentals/management/commands/create_codes.py` | Create tote codes ahead of time for sticker printing |
+| `rentals/management/commands/export_stickers.py` | Print-ready sticker PDF (2", 1/8" bleed, one per page) + CSV for a label printer |
 | `rentals/tests/` | Tests for all of the above |
 
 ## Progress

@@ -308,3 +308,26 @@ class ReservedCodeTests(TestCase):
         call_command("create_codes", "4", stdout=out)
         self.assertIn("Created 4 codes (reserved for printing)", out.getvalue())
         self.assertEqual(Bin.objects.filter(status="reserved").count(), 4)
+
+
+class StickerExportTests(TestCase):
+    def test_export_reserved_codes(self):
+        import csv
+        import tempfile
+        from io import StringIO
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        codes = sorted(b.code for b in bins.register_bins(bin_product(), 3, reserved=True))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = StringIO()
+            call_command("export_stickers", "--out", tmp, "--copies", "3", stdout=out)
+            self.assertIn("3 codes, 9 stickers", out.getvalue())
+            pdf = (Path(tmp) / "stickers.pdf").read_bytes()
+            self.assertTrue(pdf.startswith(b"%PDF"))
+            self.assertEqual(pdf.count(b"/Type /Page\n") + pdf.count(b"/Type /Page "), 9)
+            rows = list(csv.DictReader(open(Path(tmp) / "stickers.csv")))
+            self.assertEqual([r["code"] for r in rows], codes)
+            self.assertEqual(rows[0]["qr_content"], settings.QR_BASE_URL + codes[0])
+            self.assertEqual(rows[0]["quantity"], "3")
