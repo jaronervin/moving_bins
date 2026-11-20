@@ -740,7 +740,9 @@ class Signature(models.Model):
     agreement_version = models.ForeignKey(AgreementVersion, on_delete=models.PROTECT)
     agreement_sha256 = models.CharField(max_length=64, help_text="Hash of the text shown.")
     typed_name = models.CharField(max_length=150)
-    card_name = models.CharField(max_length=150, help_text="Name on the payment method.")
+    card_name = models.CharField(max_length=150, blank=True, help_text="Name on the card (from Stripe).")
+    card_brand = models.CharField(max_length=20, blank=True)
+    card_last4 = models.CharField(max_length=4, blank=True)
     email = models.EmailField()
     avs_line1_check = models.CharField(max_length=20, blank=True, help_text="From Stripe.")
     avs_postal_code_check = models.CharField(max_length=20, blank=True, help_text="From Stripe.")
@@ -750,6 +752,15 @@ class Signature(models.Model):
 
     def __str__(self):
         return f"{self.typed_name} signed v{self.agreement_version.version} for {self.booking.reference}"
+
+    @property
+    def name_matches_card(self):
+        """None until a card is saved; then whether the typed name matches the cardholder."""
+        if not self.card_name:
+            return None
+        from .signing import names_match
+
+        return names_match(self.typed_name, self.card_name)
 
 
 # ---------------------------------------------------------------------------

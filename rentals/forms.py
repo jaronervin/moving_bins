@@ -153,3 +153,26 @@ class ContactForm(Form):
 
 class FindBookingForm(Form):
     email = forms.EmailField(label="Email you booked with")
+
+
+class SignForm(Form):
+    """The agreement checkbox and typed signature."""
+
+    agree = forms.BooleanField(
+        label="I've read and agree to the Sprout Tote Co. Rental Agreement, including the authorization "
+              "in section 3 to charge my card for amounts due under it.",
+        error_messages={"required": "Please tick the box to agree."},
+    )
+    typed_name = forms.CharField(
+        label="Type your full name to sign", max_length=150,
+        help_text="Use the name on the card you'll pay with.",
+        widget=forms.TextInput(attrs={"autocomplete": "name"}),
+    )
+
+    def clean_typed_name(self):
+        from .signing import _name_tokens
+
+        name = self.cleaned_data["typed_name"].strip()
+        if len(_name_tokens(name)) < 2:
+            raise forms.ValidationError("Please type your first and last name.")
+        return name

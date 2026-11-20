@@ -68,11 +68,16 @@ def card_done(request, token):
     session_id = request.GET.get("session_id", "")
     was_awaiting = booking.status == Booking.Status.AWAITING_CARD
     try:
-        saved = bool(session_id) and payments.finish_card_setup(booking, session_id)
+        result = bool(session_id) and payments.finish_card_setup(booking, session_id)
     except stripe.StripeError:
         log.exception("Could not finish card setup for %s", booking.reference)
-        saved = False
-    if not saved:
+        result = False
+    if result == payments.NAME_MISMATCH:
+        sig = booking.signature
+        messages.error(request, f"The name on your card ({sig.card_name}) doesn't match the name you signed "
+                                f"with ({sig.typed_name}). Sign with the cardholder's name, or use a card in your name.")
+        return redirect("resign", token=token)
+    if not result:
         messages.error(request, "Your card wasn't saved. Please try again.")
         return redirect("card", token=token)
     booking.refresh_from_db()
@@ -117,3 +122,33 @@ def booking_payment_context(booking):
         "card_url": reverse("card", args=[links.make_token(booking)]),
     }
 
+
+
+def resign(request, token):
+    """Sign again (e.g. with the cardholder's name after a mismatch)."""
+    from . import signing
+    from .forms import SignForm
+
+    booking = _booking(token)
+    if booking.status not in CARD_STATUSES:
+        return redirect(links.booking_url(booking))
+    version = signing.current_version()
+    sig = getattr(booking, "signature", None)
+    form = SignForm(request.POST or None, initial={"typed_name": sig.card_name if sig else ""})
+    if request.method == "POST" and form.is_valid():
+        signing.record_signature(booking, form.cleaned_data["typed_name"], version,
+                                 **signing.evidence_from_request(request))
+        result = payments.retry_after_resign(booking) if payments.enabled() else False
+        if result == payments.SAVED:
+            booking.refresh_from_db()
+            messages.success(request, "Thanks! You're booked." if booking.status == Booking.Status.CONFIRMED
+                             else "Thanks! Your card is saved.")
+            return redirect(links.booking_url(booking))
+        if result == payments.NAME_MISMATCH:
+            messages.error(request, "That still doesn't match the name on the card. Use the cardholder's "
+                                    "name exactly, or add a different card.")
+            return redirect("resign", token=token)
+        return redirect("card", token=token)
+    return render(request, "rentals/resign.html", {
+        "booking": booking, "form": form, "signature": sig, "card_url": reverse("card", args=[token]),
+    })

@@ -15,6 +15,9 @@ urlpatterns = [
     path("b/<str:token>/card/", payment_views.card, name="card"),
     path("b/<str:token>/card/session", payment_views.card_session, name="card_session"),
     path("b/<str:token>/card/done", payment_views.card_done, name="card_done"),
+    path("b/<str:token>/sign/", payment_views.resign, name="resign"),
+    path("b/<str:token>/agreement/", views.signed_agreement, name="signed_agreement"),
+    path("agreement/", views.agreement, name="agreement"),
     path("stripe/webhook/", payment_views.stripe_webhook, name="stripe_webhook"),
     path("my-booking/", views.find_booking, name="find_booking"),
     # Tote labels. Codes in QR labels are upper case (smaller QR codes), so both work.

@@ -100,6 +100,8 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/payments.py` | Everything that talks to Stripe: save card, holds, captures, charges, webhooks |
 | `rentals/payment_views.py` | Card page, return from Stripe, webhook endpoint |
 | `rentals/middleware.py` | Content-Security-Policy header |
+| `rentals/signing.py` | Rental agreement: showing it, recording signatures, the name check, the signed PDF |
+| `rentals/agreements/` | Agreement text, one Markdown file per version |
 | `rentals/booking_flow.py` | The renter's booking steps (dates → addresses → times → contact → review) |
 | `rentals/maps.py` | Address lookup and driving distance (Google, or a fake for development) |
 | `rentals/links.py` | Private, signed booking links (no renter accounts) |
@@ -124,6 +126,9 @@ All in the admin (Business settings, Products, Packages):
       `STRIPE_PUBLISHABLE_KEY` and `STRIPE_WEBHOOK_SECRET` in the host's secrets settings.
 - [ ] **When the LLC is formed:** update Stripe's business details (legal name, business type, EIN),
       the rental agreement's party name if it changes (e.g. an "LLC" ending), and the website footer.
+- [ ] **Rental agreement:** lawyer review of `rentals/agreements/2026-11-draft.md` (open questions are in the
+      Claude Doc); publish the reviewed text as a new version.
+- [ ] **Hosting:** set `TRUST_X_FORWARDED_FOR=1` so signatures record the renter's real IP address.
 - [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
 
 ## Progress
@@ -131,11 +136,10 @@ All in the admin (Business settings, Products, Packages):
 - [x] 1. Project skeleton, models, admin
 - [x] 2. Pricing, availability and fee logic (tested); quote page
 - [x] 3. Renter booking flow, private booking link, add moving-in address later.
-      *Card and agreement steps slot into Review in milestones 4–5.*
 - [x] QR-labelled totes: per-bin tracking, scanner pages, labels, renter contents notes
 - [x] 4. Stripe: card saved at booking, hold before dropoff, charge at dropoff, late-cancel/damage/renewal
       charges, webhooks (tax not yet switched on)
-- [ ] 5. Agreement and signature evidence
+- [x] 5. Agreement signed online at Review; card name check; signed PDF emailed and on the booking page
 - [ ] 6. Owner tools: inbox, schedule, route, at-the-door, check-in
 - [ ] 7. Change/cancel, renewals, damage charges, reminders
 - [ ] 8. Deploy

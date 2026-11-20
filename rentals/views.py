@@ -70,6 +70,7 @@ def booking_detail(request, token):
         "pickup_form": pickup_form,
         "settings": BusinessSettings.load(),
         **payment_views.booking_payment_context(booking),
+        "token": token,
         "totes": totes.totes_for(booking),
         "totes_editable": booking.status == Booking.Status.OUT,
     })
@@ -91,3 +92,39 @@ def find_booking(request):
         messages.success(request, f"If there are bookings under {email}, we've emailed the links.")
         return redirect("find_booking")
     return render(request, "rentals/find_booking.html", {"form": form})
+
+
+# ---------------------------------------------------------------------------
+# The rental agreement
+# ---------------------------------------------------------------------------
+
+
+def agreement(request):
+    """The current agreement, for reading before signing."""
+    from . import signing
+
+    version = signing.current_version()
+    if version is None:
+        raise Http404
+    return render(request, "rentals/agreement.html", {"version": version, "body": signing.render_html(version)})
+
+
+def signed_agreement(request, token):
+    """The exact version this booking signed, with the signature record."""
+    from . import signing
+
+    reference = links.read_token(token)
+    booking = Booking.objects.filter(reference=reference).first() if reference else None
+    sig = getattr(booking, "signature", None) if booking else None
+    if sig is None:
+        raise Http404
+    if request.GET.get("format") == "pdf":
+        from django.http import HttpResponse
+
+        response = HttpResponse(signing.pdf_bytes(sig), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="Sprout-Tote-agreement-{booking.reference}.pdf"'
+        return response
+    return render(request, "rentals/agreement.html", {
+        "version": sig.agreement_version, "body": signing.render_html(sig.agreement_version),
+        "signature": sig, "booking": booking,
+    })

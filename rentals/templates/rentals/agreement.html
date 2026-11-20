@@ -1,0 +1,21 @@
+{% extends "rentals/base.html" %}
+{% block title %}Rental agreement · Sprout Tote Co.{% endblock %}
+{% block content %}
+<article class="card agreement">
+  <h1>Sprout Tote Co. Rental Agreement</h1>
+  <p class="muted">Version {{ version.version }}{% if booking %} · booking {{ booking.reference }}{% endif %}</p>
+  {{ body }}
+  {% if signature %}
+  <h2>Signature record</h2>
+  <dl class="facts">
+    <dt>Signed by</dt><dd>{{ signature.typed_name }}</dd>
+    <dt>Email</dt><dd>{{ signature.email }}</dd>
+    <dt>When</dt><dd>{{ signature.signed_at|date:"F j, Y, g:i A T" }}</dd>
+    <dt>IP address</dt><dd>{{ signature.ip_address|default:"not recorded" }}</dd>
+    {% if signature.card_last4 %}<dt>Card</dt><dd>{{ signature.card_brand|title }} ending {{ signature.card_last4 }}</dd>{% endif %}
+    <dt>Text fingerprint</dt><dd class="mono small">{{ signature.agreement_sha256 }}</dd>
+  </dl>
+  <p><a class="button" href="?format=pdf">Download PDF</a></p>
+  {% endif %}
+</article>
+{% endblock %}

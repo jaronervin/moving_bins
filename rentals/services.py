@@ -178,7 +178,7 @@ def order_from_draft(draft):
 
 
 @transaction.atomic
-def submit_booking(draft, now=None):
+def submit_booking(draft, now=None, signature=None):
     """Turn a finished booking-flow draft into a booking.
 
     ``draft`` is the dict the booking flow keeps in the session (see
@@ -232,6 +232,10 @@ def submit_booking(draft, now=None):
         access_notes=contact.get("access_notes", ""),
     )
     place_hold(booking, order.items(), now=now, quote=the_quote)
+    if signature:  # {"typed_name", "version", "ip_address", "user_agent"}
+        from .signing import record_signature
+
+        record_signature(booking, now=now, **signature)
 
     Visit.objects.create(booking=booking, kind=Visit.Kind.DROPOFF, requested_window=found["dropoff"])
     Visit.objects.create(booking=booking, kind=Visit.Kind.PICKUP, requested_window=found["pickup"])

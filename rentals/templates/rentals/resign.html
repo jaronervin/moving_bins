@@ -1,0 +1,15 @@
+{% extends "rentals/base.html" %}
+{% block title %}Sign again · Sprout Tote Co.{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  <h2>Sign with the cardholder's name</h2>
+  <p class="muted">The agreement must be signed by the person whose card pays for the booking.
+    {% if signature.card_name %}The card you added is in the name <b>{{ signature.card_name }}</b>.{% endif %}</p>
+  <p><a href="{% url 'agreement' %}" target="_blank" rel="noopener">Read the rental agreement</a></p>
+  <form method="post">{% csrf_token %}
+    {{ form }}
+    <button type="submit">Sign</button>
+  </form>
+  <p class="muted">Or <a href="{{ card_url }}">use a different card</a> in your own name.</p>
+</section>
+{% endblock %}

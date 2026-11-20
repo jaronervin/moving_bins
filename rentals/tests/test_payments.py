@@ -34,6 +34,14 @@ def intent(id="pi_1", status="requires_capture", amount=17700, received=0, error
               metadata={})
 
 
+def checkout_done(booking, card_name, pm="pm_9"):
+    """What Stripe returns for a completed setup-mode Checkout Session."""
+    card = NS(brand="visa", last4="4242", checks=NS(address_line1_check="pass", address_postal_code_check="pass"))
+    payment_method = NS(id=pm, billing_details=NS(name=card_name), card=card)
+    return NS(status="complete", metadata={"booking": booking.reference},
+              setup_intent=NS(status="succeeded", payment_method=payment_method))
+
+
 def booking_with_card(total=D("177.00"), status=Booking.Status.CONFIRMED, days=1):
     b = make_booking(dropoff=timezone.localdate() + timedelta(days=days))
     b.status = status
@@ -179,9 +187,7 @@ class CardStepFlowTests(FlowTestCase):
         self.assertEqual((params["mode"], params["ui_mode"]), ("setup", "embedded_page"))
         self.assertIn("{CHECKOUT_SESSION_ID}", params["return_url"])
 
-        self.stripe.v1.checkout.sessions.retrieve.return_value = NS(
-            status="complete", metadata={"booking": booking.reference},
-            setup_intent=NS(status="succeeded", payment_method="pm_9"))
+        self.stripe.v1.checkout.sessions.retrieve.return_value = checkout_done(booking, "Pat Renter")
         r = self.client.get(card_url + "done?session_id=cs_9")
         booking.refresh_from_db()
         self.assertEqual((booking.status, booking.stripe_payment_method_id), ("confirmed", "pm_9"))

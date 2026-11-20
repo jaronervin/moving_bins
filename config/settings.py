@@ -154,3 +154,7 @@ STRIPE_PAYMENT_METHOD_CONFIGURATION = os.environ.get("STRIPE_PAYMENT_METHOD_CONF
 # Only for sandboxes whose network proxy re-signs HTTPS (like the build
 # environment). Leave unset in production.
 STRIPE_CA_BUNDLE = os.environ.get("STRIPE_CA_BUNDLE", "")
+
+# Behind the production host's proxy, the visitor's real IP address arrives in
+# X-Forwarded-For. Turn this on there so signatures record the right address.
+TRUST_X_FORWARDED_FOR = os.environ.get("TRUST_X_FORWARDED_FOR", "") == "1"

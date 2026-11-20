@@ -20,6 +20,9 @@ from rentals.models import Booking, BusinessSettings, Package, Product, TimeWind
 from .helpers import assert_redirects_to_booking, bins
 
 
+SIGN = {"agree": "on", "typed_name": "Pat Renter"}
+
+
 def address(prefix, zip_code="21218", line1="10 Elm St"):
     return {f"{prefix}-line1": line1, f"{prefix}-line2": "", f"{prefix}-city": "Baltimore",
             f"{prefix}-state": "MD", f"{prefix}-zip_code": zip_code}
@@ -64,7 +67,7 @@ class FlowTestCase(TestCase):
         r = self.client.post("/book/contact/", {"name": "Pat Renter", "email": "pat@example.com",
                                                  "phone": "410-555-0100", "access_notes": "Side porch"})
         self.assertRedirects(r, "/book/review/")
-        return self.client.post("/book/review/")
+        return self.client.post("/book/review/", SIGN)
 
 
 class BookingFlowTests(FlowTestCase):
@@ -171,7 +174,7 @@ class BookingFlowTests(FlowTestCase):
             status="confirmed")
         Visit.objects.create(booking=other, kind="dropoff", window=self.drop_window, status="confirmed")
 
-        r = self.client.post("/book/review/")
+        r = self.client.post("/book/review/", SIGN)
         self.assertRedirects(r, "/book/")
         self.assertEqual(Booking.objects.count(), 1)
 

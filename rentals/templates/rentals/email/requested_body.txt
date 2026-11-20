@@ -21,6 +21,8 @@ Please add the address you're moving into before dropoff day. We can't drop
 off without it. You can add it here:
 {% endif %}
 View or change your booking: {{ link }}
+{% if signed %}
+Your signed rental agreement is attached as a PDF.{% endif %}
 
 Questions? {{ contact_email }}
 Reference: {{ booking.reference }}{% endautoescape %}

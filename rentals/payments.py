@@ -110,6 +110,8 @@ def start_card_setup(booking, return_url):
             "metadata": {"booking": booking.reference},
         },
         "metadata": {"booking": booking.reference},
+        # Full billing address so the bank checks it (AVS): evidence for the signature.
+        "billing_address_collection": "required",
         "integration_identifier": f"sprouttote-card-setup-{_tag()}",
         **_payment_method_configuration(),
     })
@@ -118,26 +120,41 @@ def start_card_setup(booking, return_url):
     return session.client_secret
 
 
+SAVED, NAME_MISMATCH = "saved", "name_mismatch"
+
+
 @transaction.atomic
 def finish_card_setup(booking, session_id):
-    """Record the saved card once Checkout is complete. Safe to call twice
-    (the return page and the webhook both call it). Returns True if saved."""
+    """Record the saved card once Checkout is complete.
+
+    Safe to call twice (the return page and the webhook both call it). Returns
+    SAVED, NAME_MISMATCH (the cardholder name doesn't match the signature, so
+    the card isn't used and the booking waits), or False (not complete).
+    """
+    from . import signing
+
     booking = Booking.objects.select_for_update().get(pk=booking.pk)
-    session = client().v1.checkout.sessions.retrieve(session_id, params={"expand": ["setup_intent"]})
+    session = client().v1.checkout.sessions.retrieve(
+        session_id, params={"expand": ["setup_intent.payment_method"]})
     if session.metadata.get("booking") != booking.reference or session.status != "complete":
         return False
     setup_intent = session.setup_intent
     if setup_intent.status != "succeeded":
         return False
     payment_method = setup_intent.payment_method
-    if not isinstance(payment_method, str):
-        payment_method = payment_method.id
-    already = booking.stripe_payment_method_id == payment_method
-    booking.stripe_payment_method_id = payment_method
+    if isinstance(payment_method, str):
+        payment_method = client().v1.payment_methods.retrieve(payment_method)
+
+    sig = signing.record_card_evidence(booking, payment_method)
+    if sig is not None and sig.name_matches_card is False:
+        return NAME_MISMATCH
+
+    already = booking.stripe_payment_method_id == payment_method.id
+    booking.stripe_payment_method_id = payment_method.id
     booking.save(update_fields=["stripe_payment_method_id", "updated_at"])
     if not already:
         client().v1.customers.update(booking.customer.stripe_customer_id, params={
-            "invoice_settings": {"default_payment_method": payment_method}})
+            "invoice_settings": {"default_payment_method": payment_method.id}})
     if booking.status == Booking.Status.AWAITING_CARD:
         from . import emails, services
 
@@ -145,7 +162,14 @@ def finish_card_setup(booking, session_id):
         emails.booking_requested(booking)
     elif booking.status == Booking.Status.CONFIRMED and due_for_authorization().filter(pk=booking.pk).exists():
         authorize(booking)  # a new card after a failed hold: try again now
-    return True
+    return SAVED
+
+
+def retry_after_resign(booking):
+    """After re-signing, use the card from the last Checkout if the names now match."""
+    if booking.stripe_checkout_session_id:
+        return finish_card_setup(booking, booking.stripe_checkout_session_id)
+    return False
 
 
 # ---------------------------------------------------------------------------

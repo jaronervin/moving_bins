@@ -6,10 +6,8 @@ The renter's booking flow, one step per page:
     3. addresses  moving out of (dropoff) and moving into (pickup)
     4. delivery   delivery-by times, porch or present, optional time request
     5. contact    name, email, phone, notes
-    6. review     check everything and book
-
-Card details (milestone 4) and the agreement (milestone 5) will slot in
-before booking.
+    6. review     check everything, sign the agreement, and book
+                  (then the card page, when payments are on)
 
 Answers are kept in the visitor's session (stored server-side, so they can't
 be tampered with) under the key "draft" until the booking is submitted.
@@ -21,8 +19,8 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from . import emails, maps, payments, pricing, services, windows
-from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm
+from . import emails, maps, payments, pricing, services, signing, windows
+from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm, SignForm
 from .links import booking_url, make_token
 from .models import BusinessSettings, Package, Product
 
@@ -233,35 +231,48 @@ def review(request):
         return r
     draft = _draft(request)
 
-    if request.method == "POST":
-        try:
-            booking = services.submit_booking(draft)
-        except services.NotEnoughStock as exc:
-            messages.error(request, f"{exc} Please change your package or dates.")
-            return redirect("book_package")
-        except services.WindowFull as exc:
-            messages.error(request, str(exc))
-            return redirect("book_package")
-        except pricing.OutOfRange as exc:
-            messages.error(request, str(exc))
-            return redirect("book_addresses")
-        del request.session[SESSION_KEY]
-        if booking.status == booking.Status.AWAITING_CARD:
-            return redirect("card", token=make_token(booking))
-        emails.booking_requested(booking)
-        if booking.status == booking.Status.CONFIRMED:
-            messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
-        else:
-            messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
-        return redirect(booking_url(booking))
+    version = signing.current_version()
+    sign_form = SignForm(request.POST or None,
+                         initial={"typed_name": draft.get("contact", {}).get("name", "")})
+    if request.method == "POST" and (version is None or sign_form.is_valid()):
+        return _submit(request, draft, version, sign_form)
 
     dropoff_date, dropoff_window, pickup_date, pickup_window = _delivery_windows(draft)
     order = _order(draft)
     return _render(request, "review", "rentals/book/review.html", {
         "order": order, "items": order.items(), "payments_on": payments.enabled(),
+        "agreement": version, "sign_form": sign_form,
         "dropoff_date": dropoff_date, "dropoff_window": dropoff_window,
         "pickup_date": pickup_date, "pickup_window": pickup_window,
     })
+
+
+def _submit(request, draft, version, sign_form):
+    """Create the booking (with its signature), then go to the card step or the booking page."""
+    signature = None
+    if version is not None:
+        signature = {"typed_name": sign_form.cleaned_data["typed_name"], "version": version,
+                     **signing.evidence_from_request(request)}
+    try:
+        booking = services.submit_booking(draft, signature=signature)
+    except services.NotEnoughStock as exc:
+        messages.error(request, f"{exc} Please change your package or dates.")
+        return redirect("book_package")
+    except services.WindowFull as exc:
+        messages.error(request, str(exc))
+        return redirect("book_package")
+    except pricing.OutOfRange as exc:
+        messages.error(request, str(exc))
+        return redirect("book_addresses")
+    del request.session[SESSION_KEY]
+    if booking.status == booking.Status.AWAITING_CARD:
+        return redirect("card", token=make_token(booking))
+    emails.booking_requested(booking)
+    if booking.status == booking.Status.CONFIRMED:
+        messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
+    else:
+        messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
+    return redirect(booking_url(booking))
 
 
 def start_over(request):

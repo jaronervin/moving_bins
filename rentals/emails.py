@@ -1,18 +1,23 @@
 """Emails to renters and owners. Text bodies live in templates/rentals/email/."""
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.template.loader import render_to_string
 
-from .models import BusinessSettings
-
 from .links import booking_url
+from .models import BusinessSettings, Signature
 
 
-def _send(to, subject_template, body_template, context):
+def _send(to, subject_template, body_template, context, attachments=()):
     subject = render_to_string(subject_template, context).strip()
     body = render_to_string(body_template, context)
-    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, to)
+    if not attachments:
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, to)
+        return
+    msg = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, to)
+    for name, content, mime in attachments:
+        msg.attach(name, content, mime)
+    msg.send()
 
 
 def booking_requested(booking):
@@ -21,8 +26,14 @@ def booking_requested(booking):
     context = {"booking": booking, "link": booking_url(booking, absolute=True),
                "review_hours": s.review_hours, "contact_email": s.contact_email,
                "total": sum((line.amount for line in booking.price_lines.all()), 0)}
+    attachments = []
+    sig = Signature.objects.filter(booking=booking).first()
+    if sig is not None:
+        from .signing import pdf_bytes
+
+        attachments.append((f"Sprout-Tote-agreement-{booking.reference}.pdf", pdf_bytes(sig), "application/pdf"))
     _send([booking.customer.email], "rentals/email/requested_subject.txt",
-          "rentals/email/requested_body.txt", context)
+          "rentals/email/requested_body.txt", {**context, "signed": sig is not None}, attachments)
     if settings.OWNER_EMAILS:
         from . import inventory
 

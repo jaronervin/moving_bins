@@ -81,6 +81,7 @@
         <td class="num">${% if c.status == "captured" %}{{ c.captured_amount }}{% else %}{{ c.total }}{% endif %}</td></tr>{% endfor %}
     </table>
     {% endif %}
+    {% if booking.signature %}<p class="muted"><a href="{% url 'signed_agreement' token %}">Your signed rental agreement</a></p>{% endif %}
     {% if payments_on and booking.stripe_payment_method_id and booking.status == "confirmed" %}<p class="muted"><a href="{{ card_url }}">Use a different card</a></p>{% endif %}
     <p class="muted">Charged when your totes are dropped off. If totes aren't ready at pickup, the rental
       extends a week for ${{ booking.renewal_week_price }}. Questions? <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a></p>

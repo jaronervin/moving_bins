@@ -137,8 +137,9 @@ set per line item.
    at the door/porch (their risk)** or **I'll be there**, with an optional
    specific-time request (required if they'll be there).
 5. **Contact**: name, email, phone, notes.
-6. **Card** and **agreement** (coming): card saved, nothing charged; typed
-   signature must match the card name.
+6. **Review and sign**: tick "I've read and agree" and type their full name
+   (§7), then **Card**: card saved in Stripe, nothing charged. The typed name
+   must match the name on the card.
 7. **Booked**: confirmed right away (§3.2). Renter gets a "You're booked"
    email with a private link to view, change or cancel.
 
@@ -378,7 +379,26 @@ items). Until then no tax is collected, by design rather than silently.
   - SHA-256 hash of the agreement text shown
 - Combined with the delivery to their address and the porch photos, this
   gives solid evidence for any dispute or chargeback.
-- Agreement text to be drafted together (separate task).
+
+**How it works (built):**
+- Text lives in `rentals/agreements/<version>.md` and is loaded into an
+  `AgreementVersion` by a migration. To change it, add a new file and a new
+  version (never edit a signed one); new bookings sign the latest version.
+  Current: `2026-11-draft` (needs a lawyer's review before launch).
+- Review step: key points, link to the full text (`/agreement/`), a required
+  "I agree" box (which names the card authorization in section 3) and a typed
+  full name, prefilled from the contact step.
+- When the card is saved, the cardholder name, brand, last 4 and AVS results
+  are added to the signature. **Name check:** same first and last name,
+  ignoring case, accents, punctuation, titles and middle names ("Pat O'Brien"
+  = "PAT OBRIEN" = "Pat J. O'Brien"). If they differ, the card isn't used and
+  the renter is sent to `/b/<token>/sign/` to re-sign with the cardholder's
+  name or add a card in their own name. The booking stays held meanwhile.
+- The signed PDF (agreement + signature record) is attached to the "You're
+  booked" email and downloadable from the booking page
+  (`/b/<token>/agreement/`).
+- Behind the production host's proxy, set `TRUST_X_FORWARDED_FOR=1` so the
+  renter's real IP address is recorded.
 
 ---
 

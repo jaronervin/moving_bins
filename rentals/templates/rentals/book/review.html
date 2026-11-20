@@ -26,9 +26,18 @@
   <div>
     {% include "rentals/book/_summary.html" %}
     <section class="card">
-      {% if payments_on %}<p class="muted">Next: add a card. It's saved securely with Stripe; nothing is charged until your totes are dropped off.</p>{% endif %}
       <form method="post">{% csrf_token %}
-        <button type="submit">{% if payments_on %}Continue to card{% elif settings.auto_confirm %}Book now{% else %}Send request{% endif %}</button>
+        {% if agreement %}
+          <h2>Rental agreement</h2>
+          <p class="muted">Please read the <a href="{% url 'agreement' %}" target="_blank" rel="noopener">Sprout Tote Co. Rental Agreement</a>
+            (opens in a new tab). Key points: you're responsible for the totes and equipment until we collect them,
+            including on a porch; $10 per lost or broken tote, $5 per lid; free cancellation up to
+            {{ settings.cancel_cutoff_hours }} hours before dropoff, 50% after that.</p>
+          {{ sign_form.non_field_errors }}
+          {{ sign_form }}
+        {% endif %}
+        {% if payments_on %}<p class="muted">Next: add a card. It's saved securely with Stripe; nothing is charged until your totes are dropped off.</p>{% endif %}
+        <button type="submit">{% if agreement and payments_on %}Sign and continue to card{% elif payments_on %}Continue to card{% elif agreement %}Sign and book{% elif settings.auto_confirm %}Book now{% else %}Send request{% endif %}</button>
       </form>
       <p class="muted"><a href="{% url 'book_start_over' %}">Start over</a></p>
     </section>
