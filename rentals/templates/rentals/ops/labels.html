@@ -24,7 +24,7 @@
 </head>
 <body>
   <div class="bar">{{ items|length }} label{{ items|length|pluralize }} ({{ copies }} per tote).
-    <a href="javascript:window.print()">Print</a> ·
+    <a href="#" data-print>Print</a> ·
     Copies per tote: <a href="?{% if request.GET.codes %}codes={{ request.GET.codes }}&{% endif %}copies=1">1</a>
     <a href="?{% if request.GET.codes %}codes={{ request.GET.codes }}&{% endif %}copies=2">2</a> ·
     <a href="{% url 'ops_index' %}">Back</a></div>
@@ -33,5 +33,6 @@
       <div class="label">{{ item.svg }}<div class="code">{{ item.code }}</div><div class="domain">{{ domain }}</div></div>
     {% empty %}<p>No totes selected.</p>{% endfor %}
   </div>
+  <script src="{% static 'rentals/site.js' %}"></script>
 </body>
 </html>

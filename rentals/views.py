@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
 
-from . import emails, inventory, links, maps, pricing, services, totes
+from . import emails, inventory, links, maps, payment_views, pricing, services, totes
 from .forms import FindBookingForm, PickupAddressForm
 from .models import Booking, BusinessSettings, Package, Product
 
@@ -69,6 +69,7 @@ def booking_detail(request, token):
         "total": sum((l.amount for l in price_lines), pricing.to_cents(0)),
         "pickup_form": pickup_form,
         "settings": BusinessSettings.load(),
+        **payment_views.booking_payment_context(booking),
         "totes": totes.totes_for(booking),
         "totes_editable": booking.status == Booking.Status.OUT,
     })

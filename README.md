@@ -41,10 +41,41 @@ The service area is a straight-line radius, so only address lookup is needed.
 3. Create an API key, restricted to that API.
 4. Run with `MAPS_BACKEND=google GOOGLE_MAPS_API_KEY=...`.
 
+## Payments (Stripe)
+
+Without `STRIPE_SECRET_KEY` the site skips the card step (handy for local work).
+With it, bookings go through Stripe's embedded Checkout to save a card.
+
+| Setting (environment variable) | What |
+|---|---|
+| `STRIPE_SECRET_KEY` | Secret or, better, **restricted** key (`rk_…`). Never in code; in production use the host's secrets settings. |
+| `STRIPE_PUBLISHABLE_KEY` | Public key for the card page (defaults to the test key). |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret of the webhook endpoint (`whsec_…`). |
+| `STRIPE_PAYMENT_METHOD_CONFIGURATION` | Optional: a payment-method configuration limited to cards (+ Link). |
+| `STRIPE_CA_BUNDLE` | Only for sandboxes behind a TLS-inspecting proxy. Leave unset in production. |
+
+**In the Stripe Dashboard before launch:**
+1. **Webhook:** Developers → Webhooks → add endpoint `https://sprouttoteco.com/stripe/webhook/` with events
+   `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.payment_failed`,
+   `payment_intent.canceled`, `payment_intent.amount_capturable_updated`, `charge.dispute.created`.
+2. **Payment methods:** keep to **cards** (and Link). Holds and later charges need a reusable card.
+3. **Restricted key** for the site with write access to Customers, Checkout Sessions, SetupIntents,
+   PaymentIntents and PaymentMethods (read).
+4. **Daily task:** `python manage.py daily_tasks` places the holds for upcoming dropoffs.
+
+Test cards: `4242 4242 4242 4242` (any future date, any CVC) works; see Stripe's test-card list for declines.
+
 ## Tests
 
 ```bash
 python manage.py test rentals
+```
+
+Three tests call your **Stripe test-mode** account for real (hold, partial capture, decline,
+release, damage charge). They only run when asked:
+
+```bash
+STRIPE_LIVE_TESTS=1 STRIPE_SECRET_KEY=sk_test_... python manage.py test rentals.tests.test_payments
 ```
 
 One test (two renters grabbing the last bins at the same instant) needs
@@ -66,6 +97,9 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/bins.py` | Tracked totes: codes, loading, pickup, check-in, missing, spare lids |
 | `rentals/totes.py` | Renter tote pages: scan a QR to note contents, search their totes |
 | `rentals/ops.py` | Owner tools: camera scanner pages, bin history, printable QR labels |
+| `rentals/payments.py` | Everything that talks to Stripe: save card, holds, captures, charges, webhooks |
+| `rentals/payment_views.py` | Card page, return from Stripe, webhook endpoint |
+| `rentals/middleware.py` | Content-Security-Policy header |
 | `rentals/booking_flow.py` | The renter's booking steps (dates → addresses → times → contact → review) |
 | `rentals/maps.py` | Address lookup and driving distance (Google, or a fake for development) |
 | `rentals/links.py` | Private, signed booking links (no renter accounts) |
@@ -86,6 +120,9 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Whole Home:** $299 proposed (was $449); waiting on Katie.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
 - [ ] **Extras stock:** turn on "track stock" for each extra once counted.
+- [ ] **Stripe live mode:** activate the account, then set live `STRIPE_SECRET_KEY` (restricted key),
+      `STRIPE_PUBLISHABLE_KEY` and `STRIPE_WEBHOOK_SECRET` in the host's secrets settings.
+- [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
 
 ## Progress
 
@@ -94,7 +131,8 @@ All in the admin (Business settings, Products, Packages):
 - [x] 3. Renter booking flow, private booking link, add moving-in address later.
       *Card and agreement steps slot into Review in milestones 4–5.*
 - [x] QR-labelled totes: per-bin tracking, scanner pages, labels, renter contents notes
-- [ ] 4. Stripe
+- [x] 4. Stripe: card saved at booking, hold before dropoff, charge at dropoff, late-cancel/damage/renewal
+      charges, webhooks (tax not yet switched on)
 - [ ] 5. Agreement and signature evidence
 - [ ] 6. Owner tools: inbox, schedule, route, at-the-door, check-in
 - [ ] 7. Change/cancel, renewals, damage charges, reminders

@@ -6,7 +6,8 @@
  */
 (function () {
   "use strict";
-  var cfg = window.SCAN;
+  var cfgEl = document.getElementById("scan-config");
+  var cfg = {mode: cfgEl.dataset.mode, reference: cfgEl.dataset.reference, api: cfgEl.dataset.api};
   var video = document.getElementById("video");
   var msg = document.getElementById("scan-msg");
   var list = document.getElementById("scanned");

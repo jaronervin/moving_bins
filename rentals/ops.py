@@ -25,8 +25,10 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
-from . import bins, inventory
-from .models import Bin, Booking, BusinessSettings, Product, StockState
+import stripe
+
+from . import bins, inventory, payments
+from .models import Bin, Booking, BusinessSettings, Charge, Product, StockState
 
 staff_required = user_passes_test(lambda u: u.is_active and u.is_staff)
 
@@ -51,6 +53,10 @@ def index(request):
         "picked": [(b, bins.check_in_progress(b)) for b in picked],
         "stock": [(p, inventory.counts(p)) for p in products],
         "buy": [n for n in (inventory.purchase_needs(p) for p in products) if n],
+        "payment_problems": (Charge.objects.filter(status=Charge.Status.FAILED,
+                                                    booking__status__in=[Booking.Status.CONFIRMED, Booking.Status.OUT,
+                                                                         Booking.Status.PICKED_UP, Booking.Status.CLOSED])
+                             .select_related("booking__customer").order_by("-created_at")[:10]),
         "states": StockState,
         "settings": BusinessSettings.load(),
     })
@@ -70,6 +76,7 @@ def scanner(request, reference, mode):
             if mode == "load":
                 bins.complete_dropoff(booking, request.user)
                 messages.success(request, f"Dropoff for {booking.reference} marked done.")
+                _charge_at_dropoff(request, booking)
             else:
                 unscanned = bins.complete_pickup(booking, request.user)
                 note = f" Scan the {len(unscanned)} remaining totes at check-in." if unscanned else ""
@@ -80,6 +87,25 @@ def scanner(request, reference, mode):
     return render(request, "rentals/ops/scanner.html", {
         "booking": booking, "mode": mode, "title": MODES[mode], **_scan_state(booking, mode),
     })
+
+
+def _charge_at_dropoff(request, booking):
+    """Capture the hold (or charge the card) once the totes are delivered."""
+    if not payments.enabled():
+        return
+    try:
+        results = payments.capture_at_dropoff(booking)
+    except stripe.StripeError as exc:
+        messages.error(request, f"Charging {booking.reference} failed: {exc.user_message or exc}. "
+                                "Check the booking in the Stripe Dashboard.")
+        return
+    failed = [c for c in results if c.status != Charge.Status.CAPTURED]
+    if failed:
+        messages.error(request, f"Charge for {booking.reference} didn't go through: "
+                                f"{failed[0].failure_message or 'declined'}. Contact the renter.")
+    else:
+        total = sum(c.captured_amount for c in results)
+        messages.success(request, f"Charged ${total} to {booking.customer.name}'s card.")
 
 
 def _scan_state(booking, mode):
@@ -117,6 +143,12 @@ def finish_check_in_view(request, reference):
     try:
         summaries = bins.finish_check_in(booking, request.user)
         damage = sum(s.damage_amount for s in summaries)
+        if damage and payments.enabled():
+            c = payments.charge(booking, Charge.Kind.DAMAGE, damage,
+                                f"Lost/damaged totes, booking {booking.reference}")
+            if c is None or c.status != Charge.Status.CAPTURED:
+                messages.error(request, f"Damage charge of ${damage} didn't go through"
+                                        f"{': ' + c.failure_message if c and c.failure_message else ''}.")
         missing = sum(s.missing for s in summaries)
         msg = f"{booking.reference} closed."
         if missing:
@@ -222,6 +254,8 @@ def decline(request, reference):
             messages.success(request, f"Asked {booking.customer.name} for a change to {booking.reference}.")
         else:
             services.decline_booking(booking, message)
+            if payments.enabled():
+                payments.release(booking)
             emails.booking_declined(booking)
             messages.success(request, f"{booking.reference} declined; {booking.customer.name} has been emailed.")
     except services.CannotDecline as exc:

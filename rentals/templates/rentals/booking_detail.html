@@ -13,6 +13,19 @@
   <p class="lede">We're sorry, we couldn't take this booking.{% if booking.decline_reason %} {{ booking.decline_reason }}{% endif %}
     Nothing was charged. <a href="{% url 'book_package' %}">Book different dates</a>.</p>
 {% endif %}
+{% if needs_card %}
+<section class="card attention">
+  <h2>Add a card to finish booking</h2>
+  <p>We're holding your totes for a few minutes. Nothing is charged until dropoff.</p>
+  <a class="button" href="{{ card_url }}">Add card</a>
+</section>
+{% elif card_problem %}
+<section class="card attention">
+  <h2>Please update your card</h2>
+  <p>Your bank didn't approve the hold we place before dropoff. Update your card so we can deliver your totes.</p>
+  <a class="button" href="{{ card_url }}">Update card</a>
+</section>
+{% endif %}
 {% if booking.change_request and booking.status == "confirmed" %}
 <section class="card attention">
   <h2>We need a change</h2>
@@ -62,6 +75,13 @@
       {% if not booking.pickup_address %}<tr><td class="muted">Pickup</td><td class="num muted">Free within {{ settings.free_radius_miles }} mi</td></tr>{% endif %}
       <tr class="total"><td>Total before tax</td><td class="num">${{ total }}</td></tr>
     </table>
+    {% if charges %}
+    <table class="charges">
+      {% for c in charges %}<tr><td>{{ c.description }}<br><span class="muted">{{ c.get_status_display }}{% if c.failure_message %}: {{ c.failure_message }}{% endif %}</span></td>
+        <td class="num">${% if c.status == "captured" %}{{ c.captured_amount }}{% else %}{{ c.total }}{% endif %}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+    {% if payments_on and booking.stripe_payment_method_id and booking.status == "confirmed" %}<p class="muted"><a href="{{ card_url }}">Use a different card</a></p>{% endif %}
     <p class="muted">Charged when your totes are dropped off. If totes aren't ready at pickup, the rental
       extends a week for ${{ booking.renewal_week_price }}. Questions? <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a></p>
   </section>
@@ -70,7 +90,7 @@
 <section class="card totes" id="totes">
   <div class="totes-head">
     <h2>Your totes{% if totes %} <span class="muted">({{ totes|length }})</span>{% endif %}</h2>
-    {% if totes %}<button type="button" class="link-button no-print" onclick="window.print()">Print list</button>{% endif %}
+    {% if totes %}<button type="button" class="link-button no-print" data-print>Print list</button>{% endif %}
   </div>
   {% if totes_editable %}
     <p class="muted no-print">Scan the QR code on any tote with your phone's camera to note what's inside.
@@ -92,21 +112,6 @@
       {% endfor %}
     </ul>
     <p class="muted" id="tote-none" hidden>No totes match.</p>
-    <script>
-      (function () {
-        var input = document.getElementById("tote-search"), items = document.querySelectorAll("#tote-list li"),
-            none = document.getElementById("tote-none");
-        input.addEventListener("input", function () {
-          var words = input.value.toLowerCase().split(/\s+/).filter(Boolean), shown = 0;
-          items.forEach(function (li) {
-            var text = li.dataset.search.toLowerCase(),
-                hit = words.every(function (w) { return text.indexOf(w) !== -1; });
-            li.hidden = !hit; if (hit) shown++;
-          });
-          none.hidden = shown !== 0;
-        });
-      })();
-    </script>
     <p class="muted">Notes are deleted {{ settings.contents_retention_days }} days after pickup.</p>
   {% else %}
     <p class="muted">Your totes will show up here once they're delivered.</p>

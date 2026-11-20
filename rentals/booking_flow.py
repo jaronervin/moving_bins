@@ -21,9 +21,9 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from . import emails, maps, pricing, services, windows
+from . import emails, maps, payments, pricing, services, windows
 from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm
-from .links import booking_url
+from .links import booking_url, make_token
 from .models import BusinessSettings, Package, Product
 
 SESSION_KEY = "draft"
@@ -246,6 +246,8 @@ def review(request):
             messages.error(request, str(exc))
             return redirect("book_addresses")
         del request.session[SESSION_KEY]
+        if booking.status == booking.Status.AWAITING_CARD:
+            return redirect("card", token=make_token(booking))
         emails.booking_requested(booking)
         if booking.status == booking.Status.CONFIRMED:
             messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
@@ -256,7 +258,7 @@ def review(request):
     dropoff_date, dropoff_window, pickup_date, pickup_window = _delivery_windows(draft)
     order = _order(draft)
     return _render(request, "review", "rentals/book/review.html", {
-        "order": order, "items": order.items(),
+        "order": order, "items": order.items(), "payments_on": payments.enabled(),
         "dropoff_date": dropoff_date, "dropoff_window": dropoff_window,
         "pickup_date": pickup_date, "pickup_window": pickup_window,
     })

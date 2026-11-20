@@ -1,0 +1,1 @@
+{% autoescape off %}Action needed: card for your Sprout Tote booking {{ booking.reference }}{% endautoescape %}

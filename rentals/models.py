@@ -108,6 +108,9 @@ class BusinessSettings(models.Model):
         default=48,
         help_text="With auto-confirm: how long after booking you can still decline it or ask for a change.",
     )
+    card_entry_minutes = models.PositiveIntegerField(
+        default=30, help_text="How long totes are held while a renter enters their card."
+    )
     hold_hours = models.PositiveIntegerField(
         default=48, help_text="How long a request holds bins while awaiting a response."
     )
@@ -469,6 +472,7 @@ def _new_reference():
 class Booking(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft (not submitted)"
+        AWAITING_CARD = "awaiting_card", "Waiting for card details"
         REQUESTED = "requested", "Requested, awaiting owner"
         TIMES_PROPOSED = "times_proposed", "New times proposed, awaiting renter"
         CONFIRMED = "confirmed", "Confirmed"
@@ -482,7 +486,7 @@ class Booking(models.Model):
     # Statuses that hold bins whatever the clock says.
     COMMITTED_STATUSES = [Status.CONFIRMED, Status.OUT]
     # Statuses that hold bins only until hold_expires_at.
-    HOLD_STATUSES = [Status.REQUESTED, Status.TIMES_PROPOSED]
+    HOLD_STATUSES = [Status.AWAITING_CARD, Status.REQUESTED, Status.TIMES_PROPOSED]
 
     reference = models.CharField(max_length=12, unique=True, default=_new_reference, editable=False)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="bookings")
@@ -536,6 +540,7 @@ class Booking(models.Model):
     )
     decline_reason = models.CharField(max_length=500, blank=True)
     stripe_payment_method_id = models.CharField(max_length=64, blank=True)
+    stripe_checkout_session_id = models.CharField(max_length=128, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -660,7 +665,7 @@ class Charge(models.Model):
     """A Stripe payment (or refund) tied to a booking."""
 
     class Kind(models.TextChoices):
-        RENTAL = "rental", "Rental + pickup fee"
+        RENTAL = "rental", "Booking total"
         LATE_CANCEL = "late_cancel", "Late cancellation"
         RENEWAL = "renewal", "Renewal week"
         DAMAGE = "damage", "Damage / loss"
@@ -681,6 +686,9 @@ class Charge(models.Model):
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0"))
     description = models.CharField(max_length=255, blank=True)
     stripe_payment_intent_id = models.CharField(max_length=64, blank=True)
+    captured_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0"), help_text="What was actually charged."
+    )
     failure_message = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

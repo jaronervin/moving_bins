@@ -1,0 +1,28 @@
+{% extends "rentals/base.html" %}
+{% load static %}
+{% block title %}Card · Sprout Tote Co.{% endblock %}
+{% block content %}
+<h1>{% if updating %}Update your card{% else %}Add a card{% endif %}</h1>
+<p class="lede">{% if updating %}Your new card replaces the old one for this booking.{% else %}
+  Booking {{ booking.reference }}: your card is saved securely with Stripe. <b>Nothing is charged now</b>;
+  we place a hold the day before dropoff and charge it when your totes are delivered.{% endif %}</p>
+<div class="grid">
+  <section class="card">
+    <div id="checkout" data-publishable-key="{{ publishable_key }}" data-session-url="{{ session_url }}">
+      <p class="muted" id="checkout-loading">Loading secure card form…</p>
+    </div>
+    {% csrf_token %}
+  </section>
+  <section class="card summary">
+    <h2>Your order</h2>
+    <table>
+      {% for line in price_lines %}<tr><td>{% if line.quantity > 1 %}{{ line.quantity }} × {% endif %}{{ line.description }}</td>
+        <td class="num">${{ line.amount }}</td></tr>{% endfor %}
+      <tr class="total"><td>Total before tax</td><td class="num">${{ total }}</td></tr>
+    </table>
+    <p class="muted">Cancel free up to {{ settings.cancel_cutoff_hours }} hours before dropoff.</p>
+  </section>
+</div>
+<script src="https://js.stripe.com/endive/stripe.js"></script>
+<script src="{% static 'rentals/card.js' %}"></script>
+{% endblock %}

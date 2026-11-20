@@ -5,6 +5,7 @@
 
 from django.core.management.base import BaseCommand
 
+from rentals import payments
 from rentals.bins import purge_old_contents
 from rentals.services import expire_holds
 from rentals.windows import generate_windows
@@ -19,3 +20,6 @@ class Command(BaseCommand):
         purged = purge_old_contents()
         self.stdout.write(f"Expired {expired} hold(s); created {created} window(s); "
                           f"deleted {purged} old tote note(s).")
+        if payments.enabled():
+            held, failed = payments.authorize_due()
+            self.stdout.write(f"Card holds placed: {len(held)}; failed (renters emailed): {len(failed)}.")

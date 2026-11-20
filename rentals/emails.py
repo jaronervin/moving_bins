@@ -54,3 +54,21 @@ def change_requested(booking):
     _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",
           {"booking": booking, "link": booking_url(booking, absolute=True),
            "contact_email": BusinessSettings.load().contact_email})
+
+
+def card_problem(booking, charge):
+    """The hold before dropoff failed: ask the renter to update their card; tell the owners."""
+    link = booking_url(booking, absolute=True)
+    _send([booking.customer.email], "rentals/email/card_problem_subject.txt",
+          "rentals/email/card_problem_body.txt",
+          {"booking": booking, "charge": charge, "link": link,
+           "contact_email": BusinessSettings.load().contact_email})
+    owner_alert(f"Card problem: {booking.reference}",
+                f"The hold before dropoff failed for {booking.reference} ({booking.customer.name}, "
+                f"dropoff {booking.dropoff_date:%a %b %-d}): {charge.failure_message or 'declined'}. "
+                "They've been emailed a link to update their card.")
+
+
+def owner_alert(subject, body):
+    if settings.OWNER_EMAILS:
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, settings.OWNER_EMAILS)

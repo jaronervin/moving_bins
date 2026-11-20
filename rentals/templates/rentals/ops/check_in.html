@@ -25,11 +25,11 @@
         <p><b>{{ b.reference }}</b> · {{ b.customer.name }}<br>
           <span class="muted">{{ prog.0 }} checked in{% if prog.1 %}, {{ prog.1 }} waiting{% endif %}{% if prog.2 %}, {{ prog.2 }} not scanned yet{% endif %}</span></p>
         <button type="submit" {% if prog.1 %}disabled{% endif %}
-          {% if prog.2 %}onclick="return confirm('{{ prog.2 }} tote{{ prog.2|pluralize }} not scanned will be marked missing and charged. Close anyway?')"{% endif %}>Close rental</button>
+          {% if prog.2 %}data-confirm="{{ prog.2 }} tote{{ prog.2|pluralize }} not scanned will be marked missing and charged. Close anyway?"{% endif %}>Close rental</button>
       </form>
     {% empty %}<p class="muted">No rentals waiting.</p>{% endfor %}
   </section>
 </div>
-<script>window.SCAN = {mode: "check_in", api: "{% url 'ops_scan_api' %}"};</script>
+<div id="scan-config" hidden data-mode="check_in" data-api="{% url 'ops_scan_api' %}"></div>
 <script src="{% static 'rentals/ops-scanner.js' %}"></script>
 {% endblock %}

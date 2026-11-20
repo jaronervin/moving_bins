@@ -143,3 +143,5 @@ h3 { font-size: 1rem; margin: 20px 0 6px; }
 .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .button-row button { width: auto; flex: 1; }
 button.secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+.charges { margin-top: 12px; }
+#checkout { min-height: 320px; }

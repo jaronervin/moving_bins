@@ -235,8 +235,29 @@ def submit_booking(draft, now=None):
 
     Visit.objects.create(booking=booking, kind=Visit.Kind.DROPOFF, requested_window=found["dropoff"])
     Visit.objects.create(booking=booking, kind=Visit.Kind.PICKUP, requested_window=found["pickup"])
-    if BusinessSettings.load().auto_confirm:
+
+    from . import payments
+
+    if payments.enabled():
+        # Hold the totes briefly while the renter enters a card (Stripe Checkout).
+        booking.status = Booking.Status.AWAITING_CARD
+        booking.hold_expires_at = now + timedelta(minutes=BusinessSettings.load().card_entry_minutes)
+        booking.save(update_fields=["status", "hold_expires_at", "updated_at"])
+    elif BusinessSettings.load().auto_confirm:
         confirm_booking(booking, now=now)
+    return booking
+
+
+def card_saved(booking, now=None):
+    """The renter's card is saved: the booking goes ahead (confirmed, or awaiting approval)."""
+    now = now or timezone.now()
+    if booking.status != Booking.Status.AWAITING_CARD:
+        return booking
+    if BusinessSettings.load().auto_confirm:
+        return confirm_booking(booking, now=now)
+    booking.status = Booking.Status.REQUESTED
+    booking.hold_expires_at = now + timedelta(hours=BusinessSettings.load().hold_hours)
+    booking.save(update_fields=["status", "hold_expires_at", "updated_at"])
     return booking
 
 

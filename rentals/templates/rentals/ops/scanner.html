@@ -23,6 +23,6 @@
       the totes at check-in back at the warehouse.</p>{% endif %}
   </section>
 </div>
-<script>window.SCAN = {mode: "{{ mode }}", reference: "{{ booking.reference }}", api: "{% url 'ops_scan_api' %}"};</script>
+<div id="scan-config" hidden data-mode="{{ mode }}" data-reference="{{ booking.reference }}" data-api="{% url 'ops_scan_api' %}"></div>
 <script src="{% static 'rentals/ops-scanner.js' %}"></script>
 {% endblock %}

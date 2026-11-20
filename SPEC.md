@@ -336,6 +336,34 @@ discovered at the door.
 
 ---
 
+### 6.2 How it's built (Stripe)
+
+Built following the Stripe plugin's best-practices guidance (API version
+`2026-09-30.endive`, `stripe` Python SDK 16, a `StripeClient` instance, no
+`payment_method_types`):
+
+| Step | Stripe API |
+|---|---|
+| Save card at booking | Checkout Session, `mode=setup`, `ui_mode=embedded_page`, mounted with Stripe.js `createEmbeddedCheckoutPage` on our card page. Totes are held 30 min (`awaiting_card`) while the renter enters it. |
+| Hold before dropoff | PaymentIntent, `capture_method=manual`, `off_session`, saved card (daily task). Failure → renter emailed to update card, owners alerted. |
+| Charge at dropoff | Capture the hold (less if the total dropped; capture + extra charge if it grew). No hold → charge directly. |
+| Decline / cancel in time | Cancel the hold. |
+| Late cancel | Capture 50% of the rental from the hold (or charge it). |
+| Damage, renewal weeks | Off-session PaymentIntent on the saved card. |
+| Records | Every attempt is a `Charge` row; webhooks keep them in step. |
+
+**Webhooks** (`/stripe/webhook/`, signature-verified): `checkout.session.completed`,
+`payment_intent.*`, `charge.dispute.created` (owners alerted).
+
+**Security:** keys only from the environment (never in code); a
+Content-Security-Policy on every page (no inline scripts); Stripe recommends a
+**restricted key** (`rk_`) in production instead of the full secret key.
+
+**Sales tax: not on yet.** Stripe Tax needs, first: Maryland registration
+recorded in Stripe (Tax → Locations), a head-office address in Tax settings,
+and product tax codes chosen with your accountant (rentals, delivery, sale
+items). Until then no tax is collected, by design rather than silently.
+
 ## 7. Rental agreement & signature evidence
 
 - Agreement text is **versioned**; each signature points to the exact

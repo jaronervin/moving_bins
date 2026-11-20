@@ -1,0 +1,11 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+We tried to place the usual hold on your card before dropoff on
+{{ booking.dropoff_date|date:"l, F j" }}, but your bank didn't approve it{% if charge.failure_message %}:
+"{{ charge.failure_message }}"{% else %}.{% endif %}
+
+Please update your card here so we can deliver your totes:
+{{ link }}
+
+Nothing has been charged. Questions? {{ contact_email }}
+Reference: {{ booking.reference }}{% endautoescape %}

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import booking_flow, ops, totes, views
+from . import booking_flow, ops, payment_views, totes, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -12,6 +12,10 @@ urlpatterns = [
     path("book/review/", booking_flow.review, name="book_review"),
     path("book/start-over/", booking_flow.start_over, name="book_start_over"),
     path("b/<str:token>/", views.booking_detail, name="booking_detail"),
+    path("b/<str:token>/card/", payment_views.card, name="card"),
+    path("b/<str:token>/card/session", payment_views.card_session, name="card_session"),
+    path("b/<str:token>/card/done", payment_views.card_done, name="card_done"),
+    path("stripe/webhook/", payment_views.stripe_webhook, name="stripe_webhook"),
     path("my-booking/", views.find_booking, name="find_booking"),
     # Tote labels. Codes in QR labels are upper case (smaller QR codes), so both work.
     path("q/<str:code>", totes.tote, name="tote"),

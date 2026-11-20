@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "rentals.middleware.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -133,3 +134,23 @@ BOOKING_LINK_MAX_AGE_DAYS = 120
 # keeping the /Q/<code> part.
 QR_BASE_URL = os.environ.get("QR_BASE_URL", "HTTPS://SPROUTTOTE.COM/Q/")
 LOGIN_URL = "admin:login"
+
+# ---------------------------------------------------------------------------
+# Stripe
+# ---------------------------------------------------------------------------
+# Never put keys in code. Locally and in production they come from the
+# environment (in production: the host's secrets settings). With no secret
+# key set, the site runs without the payment step (useful for development).
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+# Publishable keys are public (they go in the web page).
+STRIPE_PUBLISHABLE_KEY = os.environ.get(
+    "STRIPE_PUBLISHABLE_KEY",
+    "pk_test_51UdsQ1ItEfnAO89A5N6UxIeXmfeU64l8qkjCWptBSE2273tXP8dpaB0JPzTNJVGrQXYmwCd15yfsPJjlDTF40gfr00VoRQv6gh",
+)
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+# Optional: a payment method configuration limited to cards (and Link), since
+# holds and later charges need a reusable card. Set up in the Stripe Dashboard.
+STRIPE_PAYMENT_METHOD_CONFIGURATION = os.environ.get("STRIPE_PAYMENT_METHOD_CONFIGURATION", "")
+# Only for sandboxes whose network proxy re-signs HTTPS (like the build
+# environment). Leave unset in production.
+STRIPE_CA_BUNDLE = os.environ.get("STRIPE_CA_BUNDLE", "")

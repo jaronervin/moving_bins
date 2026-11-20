@@ -10,6 +10,16 @@
     {% else %}Order by <b>{{ need.order_by|date:"D M j" }}</b>.{% endif %}</p>
 </section>
 {% endfor %}
+{% if payment_problems %}
+<section class="card attention">
+  <h2>Payment problems</h2>
+  {% for c in payment_problems %}
+    <p><b>{{ c.booking.reference }}</b> · {{ c.booking.customer.name }} · {{ c.get_kind_display }} ${{ c.total }}
+      <span class="muted">· {{ c.failure_message|default:"declined" }} · {{ c.created_at|date:"D M j" }}</span></p>
+  {% endfor %}
+  <p class="muted">Details and retries are in the Stripe Dashboard. Renters with a failed hold are emailed a link to update their card.</p>
+</section>
+{% endif %}
 {% if reviewable %}
 <section class="card">
   <h2>New bookings (you can still decline or ask for a change)</h2>
@@ -26,7 +36,7 @@
         <div class="button-row">
           <button type="submit" name="action" value="change" class="secondary">Ask for a change</button>
           <button type="submit" name="action" value="decline" class="danger"
-                  onclick="return confirm('Decline {{ b.reference }} and email {{ b.customer.name|escapejs }}?')">Decline booking</button>
+                  data-confirm="Decline {{ b.reference }} and email {{ b.customer.name }}?">Decline booking</button>
         </div>
       </form>
     </details>

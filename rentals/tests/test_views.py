@@ -33,3 +33,24 @@ class CountedTests(TestCase):
                  (2, "Wardrobe box"): "2 wardrobe boxes", (1, "Hand truck"): "1 hand truck"}
         for (q, name), expected in cases.items():
             self.assertEqual(counted(q, name), expected)
+
+
+class SecurityHeaderTests(TestCase):
+    def test_csp_allows_stripe_and_blocks_inline_scripts(self):
+        r = self.client.get("/")
+        csp = r["Content-Security-Policy"]
+        self.assertIn("script-src 'self' https://js.stripe.com", csp)
+        self.assertIn("frame-src https://js.stripe.com", csp)
+        self.assertNotIn("'unsafe-inline' https://js.stripe.com", csp)
+        self.assertNotIn("script-src 'self' 'unsafe-inline'", csp)
+
+    def test_no_inline_scripts_in_templates(self):
+        import pathlib
+        import re
+
+        root = pathlib.Path(__file__).resolve().parents[1] / "templates"
+        for path in root.rglob("*.html"):
+            text = path.read_text()
+            self.assertIsNone(re.search(r"<script(?![^>]*\bsrc=)[^>]*>", text), path)
+            self.assertIsNone(re.search(r"\son(click|submit|load|change|input)=", text), path)
+            self.assertNotIn("javascript:", text, path)

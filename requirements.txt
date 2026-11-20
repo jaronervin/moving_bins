@@ -5,3 +5,4 @@ Pillow>=11
 segno>=1.6
 reportlab>=4
 fonttools>=4.40
+stripe==16.0.0
