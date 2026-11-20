@@ -70,7 +70,7 @@ replace with the real address in settings):
 | Distance | Dropoff and pickup |
 |---|---|
 | Up to 20 mi | Free |
-| 20–35 mi | **$25 per address** (**placeholder**; real amount to come) |
+| 20–35 mi | **$25 per address** (until further notice; checking with Katie) |
 | Over 35 mi | Not served online |
 
 A city list may be added later. Addresses are looked up with Google
@@ -482,8 +482,8 @@ availability and fees.
 - [ ] Exact base address (replaces ZIP 21214 center)
 - [ ] Liability insurance / business entity (worth asking about)
 
-**Placeholders to replace before launch:** 20–35 mile fee $25; stock
-counts for extras. (Phone 703-703-2511 is a real number and stays for now.)
+**Placeholders to replace before launch:** stock counts for extras. (The
+20–35 mile fee of $25 stands until further notice.) (Phone 703-703-2511 is a real number and stays for now.)
 
 ---
 
@@ -491,6 +491,6 @@ counts for extras. (Phone 703-703-2511 is a real number and stays for now.)
 
 1. Premium package above Whole Home: what's included (moving blankets,
    door jamb protectors, …) and its price.
-2. Fee for the 20–35 mile zone.
+2. Fee for the 20–35 mile zone ($25 for now).
 3. How many of each rental extra you own (to turn on stock checks).
 4. City list for the service area: replace or supplement the radius?

@@ -116,7 +116,6 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 
 All in the admin (Business settings, Products, Packages):
 
-- [ ] **20–35 mile fee:** $25 per address is a placeholder.
 - [ ] **Premium package** above Whole Home (Katie's $449 tier: adds moving blankets, door jamb
       protectors, etc.); waiting on the details.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
