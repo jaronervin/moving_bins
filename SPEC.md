@@ -496,6 +496,17 @@ further notice, and phone 703-703-2511 is a real number.
 
 ---
 
+## 12a. Later: offering this to other rental companies (back burner)
+
+The owners may sell this as software (SaaS) once Sprout Tote has run a
+season. That would mean one site serving many businesses: separate accounts
+and data per business, Stripe Connect so payments go to each business's own
+Stripe account, per-business branding, agreement and domain, and a monthly
+subscription. Not planned yet; CLAUDE.md lists the habits that keep it cheap
+to add later.
+
+---
+
 ## 13. Open questions
 
 1. Premium package above Whole Home: what's included (moving blankets,
