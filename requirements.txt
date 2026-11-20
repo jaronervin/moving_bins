@@ -7,3 +7,5 @@ reportlab>=4
 fonttools>=4.40
 stripe==16.0.0
 markdown>=3.5
+gunicorn>=23
+whitenoise>=6.8

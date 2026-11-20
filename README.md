@@ -65,6 +65,22 @@ With it, bookings go through Stripe's embedded Checkout to save a card.
 
 Test cards: `4242 4242 4242 4242` (any future date, any CVC) works; see Stripe's test-card list for declines.
 
+## Deploying (Render)
+
+`render.yaml` describes the test copy of the site (staging): a web service and
+a Postgres database, both on Render's free plan. `build.sh` runs on every
+deploy (install, static files, database migrations, first owner login).
+
+1. In Render: **New > Blueprint**, connect GitHub, pick this repository and the branch to deploy.
+2. Fill in the values Render asks for: Stripe test secret key and webhook secret, the first owner
+   login (username, email, password), and `OWNER_EMAILS`.
+3. Every push to that branch redeploys automatically.
+
+Emails go to Render's logs until an email provider is set up (`EMAIL_BACKEND` and `EMAIL_HOST*`).
+The free plan has no scheduled jobs, so `daily_tasks` (expire holds, add delivery days, card holds)
+doesn't run on staging by itself; production needs a Render Cron Job running
+`python manage.py daily_tasks` each morning.
+
 ## Tests
 
 ```bash

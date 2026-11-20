@@ -31,6 +31,19 @@ ALLOWED_HOSTS = [
     for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if h.strip()
 ]
+# Render sets this to the site's onrender.com address.
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+CSRF_TRUSTED_ORIGINS = [f"https://{h}" for h in ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1")]
+
+if not DEBUG:
+    # The host terminates HTTPS and tells us so in this header.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "3600"))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -45,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves CSS/JS/images in production
     "rentals.middleware.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -95,6 +109,11 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage" if not DEBUG
+                    else "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -122,6 +141,9 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Sprout Tote Co. <book
 
 # Who gets "new request" emails. Comma-separated.
 OWNER_EMAILS = [e.strip() for e in os.environ.get("OWNER_EMAILS", "").split(",") if e.strip()]
+
+# A strip across the top of every page, e.g. on the test copy of the site.
+SITE_BANNER = os.environ.get("SITE_BANNER", "")
 
 # Used to build links in emails, e.g. https://example.com (no trailing slash).
 SITE_URL = os.environ.get("SITE_URL", "http://127.0.0.1:8000")

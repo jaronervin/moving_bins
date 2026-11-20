@@ -1,0 +1,54 @@
+# Render Blueprint: the test copy of the site (staging) and its database.
+# In Render: New > Blueprint, pick this repository and branch.
+# Secrets marked "sync: false" are typed into Render's dashboard, never stored here.
+
+databases:
+  - name: sprout-staging-db
+    plan: free            # free databases expire after 30 days; fine for testing
+    databaseName: sprout
+    user: sprout
+    region: virginia
+
+services:
+  - type: web
+    name: sprout-staging
+    runtime: python
+    plan: free            # sleeps when idle; first visit after a while takes ~1 minute
+    region: virginia
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --workers 2 --timeout 60
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sprout-staging-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: TRUST_X_FORWARDED_FOR
+        value: "1"
+      - key: SITE_BANNER
+        value: "Test site: bookings here aren't real. Use Stripe test card 4242 4242 4242 4242."
+      - key: MAPS_BACKEND
+        value: fake       # switch to google once there's a Maps API key
+      # Stripe test mode
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # First owner login (created on the first deploy)
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: OWNER_EMAILS
+        sync: false
+      # Email stays off (printed to Render's logs) until an email provider is set up.
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.console.EmailBackend
