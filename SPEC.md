@@ -45,6 +45,9 @@ Every rental starts from a package (prices for 2 weeks, from Katie's sheet):
 | 2BR | 40 | 2 dollies | $169 | $65 |
 | 3BR | 60 | 2 dollies | $229 | $85 |
 | Whole Home | 80 | 3 dollies, 1 hand truck | $299 | $99 |
+| *Premium (planned)* | | Whole Home plus moving blankets, door jamb protectors, etc. | ~$449 | |
+
+The premium tier is waiting on the full list of what's included.
 
 - **Extra totes:** $5 each for the first 2 weeks, then $3 per tote per extra
   week. Priced so a package plus extra totes never undercuts the next
@@ -52,8 +55,7 @@ Every rental starts from a package (prices for 2 weeks, from Katie's sheet):
 - **Every rental includes** color-coded labels, zip ties and a marker.
 - **Rental extras**, one-time fee per rental (priced near cost, so two uses
   pay for them): dolly $10, hand truck $15, appliance dolly $25, moving
-  blanket $5, wardrobe box $15, dish/glass divider $15 (**placeholder**;
-  quoted as $15–30), floor runner & door jamb guards $25.
+  blanket $5, wardrobe box $15, dish/glass divider $25, floor runner & door jamb guards $25.
 - **For sale:** mattress bag Queen/King $10, Twin/Full $8, packing kit
   (kraft paper, honeycomb wrap, paper tape) $35, foam pouch $1.
 - All prices, packages and contents are editable in admin. Prices are
@@ -480,17 +482,15 @@ availability and fees.
 - [ ] Exact base address (replaces ZIP 21214 center)
 - [ ] Liability insurance / business entity (worth asking about)
 
-**Placeholders to replace before launch:** phone 703-703-2511; 20–35 mile
-fee $25; dish/glass divider $15; Whole Home $299 (pending Katie); stock
-counts for extras.
+**Placeholders to replace before launch:** 20–35 mile fee $25; stock
+counts for extras. (Phone 703-703-2511 is a real number and stays for now.)
 
 ---
 
 ## 13. Open questions
 
-1. Whole Home at $299 (proposed; was $449): pending Katie.
+1. Premium package above Whole Home: what's included (moving blankets,
+   door jamb protectors, …) and its price.
 2. Fee for the 20–35 mile zone.
-3. Dish/glass divider: one price or sizes?
-4. How many of each rental extra you own (to turn on stock checks).
-5. City list for the service area: replace or supplement the radius?
-6. Real phone number.
+3. How many of each rental extra you own (to turn on stock checks).
+4. City list for the service area: replace or supplement the radius?

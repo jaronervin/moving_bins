@@ -116,10 +116,9 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 
 All in the admin (Business settings, Products, Packages):
 
-- [ ] **Phone number:** 703-703-2511 is a placeholder and shows in every page's footer.
 - [ ] **20–35 mile fee:** $25 per address is a placeholder.
-- [ ] **Dish/glass divider:** $15 is a placeholder (quoted as $15–30).
-- [ ] **Whole Home:** $299 proposed (was $449); waiting on Katie.
+- [ ] **Premium package** above Whole Home (Katie's $449 tier: adds moving blankets, door jamb
+      protectors, etc.); waiting on the details.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
 - [ ] **Extras stock:** turn on "track stock" for each extra once counted.
 - [ ] **Stripe live mode:** activate the account, then set live `STRIPE_SECRET_KEY` (restricted key),
