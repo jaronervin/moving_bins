@@ -29,17 +29,24 @@ from .helpers import make_booking
 from .test_booking_flow import FlowTestCase
 
 
-def intent(id="pi_1", status="requires_capture", amount=17700, received=0, error=None):
-    return NS(id=id, status=status, amount=amount, amount_received=received, last_payment_error=error,
-              metadata={})
+def sdk(values):
+    """A real Stripe SDK object (not a dict: no .get), like the API returns."""
+    return stripe.StripeObject.construct_from(values, "sk_test_fake")
+
+
+def intent(id="pi_1", status="requires_capture", amount=17700, received=0, error=None, metadata=None):
+    return sdk({"id": id, "status": status, "amount": amount, "amount_received": received,
+                "last_payment_error": error, "metadata": metadata or {}})
 
 
 def checkout_done(booking, card_name, pm="pm_9"):
     """What Stripe returns for a completed setup-mode Checkout Session."""
-    card = NS(brand="visa", last4="4242", checks=NS(address_line1_check="pass", address_postal_code_check="pass"))
-    payment_method = NS(id=pm, billing_details=NS(name=card_name), card=card)
-    return NS(status="complete", metadata={"booking": booking.reference},
-              setup_intent=NS(status="succeeded", payment_method=payment_method))
+    card = {"brand": "visa", "last4": "4242",
+            "checks": {"address_line1_check": "pass", "address_postal_code_check": "pass"}}
+    payment_method = {"id": pm, "object": "payment_method", "billing_details": {"name": card_name}, "card": card}
+    return sdk({"id": "cs_9", "object": "checkout.session", "mode": "setup", "status": "complete",
+                "metadata": {"booking": booking.reference},
+                "setup_intent": {"id": "seti_9", "status": "succeeded", "payment_method": payment_method}})
 
 
 def booking_with_card(total=D("177.00"), status=Booking.Status.CONFIRMED, days=1):
@@ -156,6 +163,15 @@ class PaymentFlowTests(TestCase):
         r = self.client.post("/stripe/webhook/", b"{}", content_type="application/json",
                              HTTP_STRIPE_SIGNATURE="t=1,v1=ok")
         self.assertEqual(r.status_code, 200)
+        charge.refresh_from_db()
+        self.assertEqual(charge.status, Charge.Status.RELEASED)
+
+    def test_webhook_finds_charge_by_metadata(self):
+        b = booking_with_card()
+        self.stripe.v1.payment_intents.create.return_value = intent(id="pi_other")
+        charge = payments.authorize(b)
+        lost = intent(id="pi_unknown", status="canceled", metadata={"charge": str(charge.pk)})
+        payments.handle_event(sdk({"id": "evt_2", "type": "payment_intent.canceled", "data": {"object": lost.to_dict()}}))
         charge.refresh_from_db()
         self.assertEqual(charge.status, Charge.Status.RELEASED)
 

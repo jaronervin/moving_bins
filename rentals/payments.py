@@ -123,6 +123,17 @@ def start_card_setup(booking, return_url):
 SAVED, NAME_MISMATCH = "saved", "name_mismatch"
 
 
+def _meta(obj, key):
+    """A metadata value from a Stripe object. Stripe's SDK objects aren't dicts
+    (no .get), so convert first."""
+    metadata = getattr(obj, "metadata", None)
+    if metadata is None:
+        return None
+    if hasattr(metadata, "to_dict"):
+        metadata = metadata.to_dict()
+    return metadata.get(key)
+
+
 @transaction.atomic
 def finish_card_setup(booking, session_id):
     """Record the saved card once Checkout is complete.
@@ -136,7 +147,7 @@ def finish_card_setup(booking, session_id):
     booking = Booking.objects.select_for_update().get(pk=booking.pk)
     session = client().v1.checkout.sessions.retrieve(
         session_id, params={"expand": ["setup_intent.payment_method"]})
-    if session.metadata.get("booking") != booking.reference or session.status != "complete":
+    if _meta(session, "booking") != booking.reference or session.status != "complete":
         return False
     setup_intent = session.setup_intent
     if setup_intent.status != "succeeded":
@@ -338,14 +349,14 @@ def handle_event(event):
     obj = event.data.object
     kind = event.type
     if kind == "checkout.session.completed" and obj.mode == "setup":
-        booking = Booking.objects.filter(reference=(obj.metadata or {}).get("booking")).first()
+        booking = Booking.objects.filter(reference=_meta(obj, "booking")).first()
         if booking:
             finish_card_setup(booking, obj.id)
             return f"card saved for {booking.reference}"
     elif kind.startswith("payment_intent."):
         charge = Charge.objects.filter(stripe_payment_intent_id=obj.id).first()
-        if charge is None and (obj.metadata or {}).get("charge"):
-            charge = Charge.objects.filter(pk=obj.metadata["charge"]).first()
+        if charge is None and _meta(obj, "charge"):
+            charge = Charge.objects.filter(pk=_meta(obj, "charge")).first()
         if charge:
             _apply(charge, obj)
             return f"charge {charge.pk} is {charge.status}"
