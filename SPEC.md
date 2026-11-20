@@ -432,8 +432,7 @@ availability and fees.
 
 **Placeholders to replace before launch:** phone 703-703-2511; 20–35 mile
 fee $25; dish/glass divider $15; Whole Home $299 (pending Katie); stock
-counts for extras. Whole Home $299 pending Katie (original $449 let 3BR + extras
-undercut it).
+counts for extras.
 
 ---
 
