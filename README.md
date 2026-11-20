@@ -83,7 +83,7 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Phone number:** 703-703-2511 is a placeholder and shows in every page's footer.
 - [ ] **20–35 mile fee:** $25 per address is a placeholder.
 - [ ] **Dish/glass divider:** $15 is a placeholder (quoted as $15–30).
-- [ ] **Whole Home:** $249 assumed; Katie may prefer $299.
+- [ ] **Whole Home:** $299 proposed (was $449); waiting on Katie.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
 - [ ] **Extras stock:** turn on "track stock" for each extra once counted.
 

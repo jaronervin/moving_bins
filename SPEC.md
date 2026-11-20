@@ -44,7 +44,7 @@ Every rental starts from a package (prices for 2 weeks, from Katie's sheet):
 | Studio/1BR | 20 | 1 dolly | $119 | $45 |
 | 2BR | 40 | 2 dollies | $169 | $65 |
 | 3BR | 60 | 2 dollies | $229 | $85 |
-| Whole Home | 80 | 3 dollies, 1 hand truck | $249 | $99 |
+| Whole Home | 80 | 3 dollies, 1 hand truck | $299 | $99 |
 
 - **Extra totes:** $5 each for the first 2 weeks, then $3 per tote per extra
   week. Priced so a package plus extra totes never undercuts the next
@@ -431,14 +431,15 @@ availability and fees.
 - [ ] Liability insurance / business entity (worth asking about)
 
 **Placeholders to replace before launch:** phone 703-703-2511; 20–35 mile
-fee $25; dish/glass divider $15; Whole Home $249 (pending Katie); stock
-counts for extras.
+fee $25; dish/glass divider $15; Whole Home $299 (pending Katie); stock
+counts for extras. Whole Home $299 pending Katie (original $449 let 3BR + extras
+undercut it).
 
 ---
 
 ## 13. Open questions
 
-1. Whole Home: $249 (assumed) or $299?
+1. Whole Home at $299 (proposed; was $449): pending Katie.
 2. Fee for the 20–35 mile zone.
 3. Dish/glass divider: one price or sizes?
 4. How many of each rental extra you own (to turn on stock checks).

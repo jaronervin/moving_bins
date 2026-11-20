@@ -11,7 +11,7 @@ from rentals.pricing import PackageTerms
 STUDIO = PackageTerms("Studio/1BR", 20, D("119"), D("45"))
 TWO_BR = PackageTerms("2BR", 40, D("169"), D("65"))
 THREE_BR = PackageTerms("3BR", 60, D("229"), D("85"))
-WHOLE = PackageTerms("Whole Home", 80, D("249"), D("99"))
+WHOLE = PackageTerms("Whole Home", 80, D("299"), D("99"))
 PACKAGES = [STUDIO, TWO_BR, THREE_BR, WHOLE]
 ADDON, ADDON_WEEK = D("5"), D("3")
 
@@ -24,7 +24,7 @@ def price(pkg, weeks=2, addons=0, **kw):
 class PackageTests(SimpleTestCase):
     def test_package_prices(self):
         self.assertEqual([price(p).total_before_tax for p in PACKAGES],
-                         [D("119.00"), D("169.00"), D("229.00"), D("249.00")])
+                         [D("119.00"), D("169.00"), D("229.00"), D("299.00")])
 
     def test_extra_weeks(self):
         self.assertEqual(price(TWO_BR, weeks=3).total_before_tax, D("234.00"))  # 169 + 65

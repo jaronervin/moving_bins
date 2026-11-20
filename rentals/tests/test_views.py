@@ -11,7 +11,7 @@ class HomePageTests(TestCase):
 
     def test_shows_packages_and_add_ons(self):
         r = self.client.get("/")
-        for text in ("Studio/1BR", "$119", "2BR", "$169", "3BR", "$229", "Whole Home", "$249",
+        for text in ("Studio/1BR", "$119", "2BR", "$169", "3BR", "$229", "Whole Home", "$299",
                      "80 totes", "3 dollies", "1 hand truck", "1 dolly", "Appliance dolly", "Packing kit",
                      "$5 each for 2 weeks, then $3/week"):
             self.assertContains(r, text)
