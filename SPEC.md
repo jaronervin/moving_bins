@@ -99,6 +99,8 @@ set per line item.
   - **Missing or broken lid only: $5.** Lids aren't sold separately, but
     broken bins leave good spare lids behind (§4.1).
   - Scuffs, scratches and normal wear: no charge.
+  - **Found later:** a tote charged as missing that comes back usable is
+    refunded minus $3 per week (or part week) since the original pickup date.
 - Charged to the saved card with an itemized email.
 
 > Why $10 and not $6–7: the weekly rent paid for the *use* of that bin for

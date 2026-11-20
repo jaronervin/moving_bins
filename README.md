@@ -122,6 +122,8 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Extras stock:** turn on "track stock" for each extra once counted.
 - [ ] **Stripe live mode:** activate the account, then set live `STRIPE_SECRET_KEY` (restricted key),
       `STRIPE_PUBLISHABLE_KEY` and `STRIPE_WEBHOOK_SECRET` in the host's secrets settings.
+- [ ] **When the LLC is formed:** update Stripe's business details (legal name, business type, EIN),
+      the rental agreement's party name if it changes (e.g. an "LLC" ending), and the website footer.
 - [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
 
 ## Progress
