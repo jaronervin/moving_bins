@@ -1,18 +1,21 @@
 """The renter's booking flow, end to end through the web pages.
 
-Uses the fake maps backend: distances come from a ZIP table in rentals/maps.py
-(21218 → 4 mi, 21401 → 35 mi, 21702 → 55 mi, 21801 → 125 mi).
+Uses the fake maps backend: straight-line distances come from a ZIP table in
+rentals/maps.py (21218 → 4 mi, 21401 → 26 mi, 20001 → 36 mi, 21702 → 48 mi).
+Free within 20 miles, $25 per address from 20 to 35 miles, refused beyond.
 """
 
 import re
 from datetime import time, timedelta
+from decimal import Decimal as D
 
+from django.contrib.auth.models import User
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from rentals import inventory, links, services
-from rentals.models import Booking, BusinessSettings, TimeWindow, Visit
+from rentals.models import Booking, BusinessSettings, Package, Product, TimeWindow, Visit
 
 from .helpers import assert_redirects_to_booking, bins
 
@@ -22,86 +25,120 @@ def address(prefix, zip_code="21218", line1="10 Elm St"):
             f"{prefix}-state": "MD", f"{prefix}-zip_code": zip_code}
 
 
-@override_settings(MAPS_BACKEND="fake", OWNER_EMAILS=["owner@example.com"])
-class BookingFlowTests(TestCase):
-    def setUp(self):
-        inventory.record_purchase(bins(), 100)
-        self.dropoff = timezone.localdate() + timedelta(days=10)
-        self.pickup = self.dropoff + timedelta(days=7)
-        self.drop_window = TimeWindow.objects.create(date=self.dropoff, start=time(8), end=time(10), max_stops=1)
-        self.pick_window = TimeWindow.objects.create(date=self.pickup, start=time(13), end=time(15))
+def pkg(slug):
+    return Package.objects.get(slug=slug)
 
-    def walk(self, qty=35, pickup_zip="21401", pickup_unknown=False):
+
+def product(slug):
+    return Product.objects.get(slug=slug)
+
+
+@override_settings(MAPS_BACKEND="fake", OWNER_EMAILS=["owner@example.com"])
+class FlowTestCase(TestCase):
+    weeks = 3
+
+    def setUp(self):
+        inventory.record_purchase(bins(), 60)
+        self.dropoff = timezone.localdate() + timedelta(days=10)
+        self.pickup = self.dropoff + timedelta(days=7 * self.weeks)
+        self.drop_window = TimeWindow.objects.create(date=self.dropoff, start=time(9), end=time(13), max_stops=1)
+        self.pick_window = TimeWindow.objects.create(date=self.pickup, start=time(9), end=time(13))
+        User.objects.create_user("owner", password="x", is_staff=True)
+
+    def step_package(self, package="2br", weeks=None, dropoff=None):
+        return self.client.post("/book/", {"package": pkg(package).pk, "weeks": weeks or self.weeks,
+                                           "dropoff_date": (dropoff or self.dropoff).isoformat()})
+
+    def walk(self, package="2br", addons=0, extras=None, pickup_zip="21401", pickup_unknown=False,
+             presence="porch", time_request=""):
         """Fill in every step; returns the response to the final submit."""
-        r = self.client.post("/book/", {"quantity": qty, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        self.assertRedirects(r, "/book/addresses/")
+        self.assertRedirects(self.step_package(package), "/book/extras/")
+        data = {"addon_totes": addons, **{f"x_{product(s).pk}": q for s, q in (extras or {}).items()}}
+        self.assertRedirects(self.client.post("/book/extras/", data), "/book/addresses/")
         data = {**address("dropoff"), **address("pickup", pickup_zip, line1="22 Oak Ave")}
         if pickup_unknown:
             data = {**address("dropoff"), "pickup-unknown": "on"}
-        r = self.client.post("/book/addresses/", data)
-        self.assertRedirects(r, "/book/times/")
-        r = self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk,
-                                               "pickup_window": self.pick_window.pk})
+        self.assertRedirects(self.client.post("/book/addresses/", data), "/book/delivery/")
+        r = self.client.post("/book/delivery/", {"presence": presence, "time_request": time_request})
         self.assertRedirects(r, "/book/contact/")
         r = self.client.post("/book/contact/", {"name": "Pat Renter", "email": "pat@example.com",
                                                  "phone": "410-555-0100", "access_notes": "Side porch"})
         self.assertRedirects(r, "/book/review/")
         return self.client.post("/book/review/")
 
-    def test_happy_path(self):
-        review = self.client.get("/book/review/")
-        self.assertRedirects(review, "/book/")  # can't skip ahead
 
-        r = self.walk()
+class BookingFlowTests(FlowTestCase):
+    def test_happy_path(self):
+        self.assertRedirects(self.client.get("/book/review/"), "/book/")  # can't skip ahead
+
+        r = self.walk(addons=5, extras={"moving-blanket": 4, "packing-kit": 1})
         booking = Booking.objects.get()
-        # Auto-confirmed with the renter's chosen windows; owners have 24h to decline.
-        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
-        self.assertIsNone(booking.hold_expires_at)
-        self.assertAlmostEqual((booking.review_until - timezone.now()).total_seconds(), 24 * 3600, delta=60)
-        self.assertEqual(booking.visits.get(kind="dropoff").window, self.drop_window)
-        self.assertEqual(booking.visits.get(kind="dropoff").status, "confirmed")
-        self.assertEqual(booking.lines.get().quantity, 35)
-        self.assertEqual((booking.dropoff_miles, booking.pickup_miles), (4, 35))
-        self.assertEqual(str(booking.pickup_fee), "15.00")  # 5 miles × $3
-        self.assertEqual(booking.visits.get(kind="dropoff").requested_window, self.drop_window)
-        self.assertEqual(booking.access_notes, "Side porch")
         assert_redirects_to_booking(self, r, booking)
 
-        page = self.client.get(links.booking_url(booking))
-        self.assertContains(page, booking.reference)
-        self.assertContains(page, "$177.05")  # 162.05 + 15.00
+        # Confirmed straight away; owners have 48 hours to decline or ask for a change.
+        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
+        self.assertAlmostEqual((booking.review_until - timezone.now()).total_seconds(), 48 * 3600, delta=60)
+        self.assertEqual(booking.visits.get(kind="dropoff").window, self.drop_window)
+        self.assertEqual(booking.visits.get(kind="pickup").window, self.pick_window)
 
-        self.assertEqual(len(mail.outbox), 2)
-        # The emailed link opens this booking (links carry a timestamp, so compare what they point to).
+        # 2BR for 3 weeks: 169 + 65; 5 extra totes × (5 + 3); 4 blankets × 5; packing kit 35;
+        # pickup address 26 miles away: $25 zone fee.
+        lines = [(l.kind, l.quantity, l.amount) for l in booking.price_lines.all()]
+        self.assertEqual(lines, [("package", 1, D("234.00")), ("addon", 5, D("40.00")),
+                                 ("rental", 4, D("20.00")), ("sale", 1, D("35.00")),
+                                 ("delivery", 1, D("25.00"))])
+        self.assertEqual(booking.renewal_week_price, D("80.00"))  # 65 + 5 × 3
+        items = {l.product.slug: l.quantity for l in booking.lines.all()}
+        self.assertEqual(items, {"bin-27gal": 45, "dolly": 2, "moving-blanket": 4, "packing-kit": 1})
+        self.assertEqual((booking.dropoff_miles, booking.pickup_miles), (4, 26))
+
+        page = self.client.get(links.booking_url(booking))
+        self.assertContains(page, "$354.00")
+        self.assertContains(page, "by 1:00 PM")
+
+        self.assertIn("You're booked", mail.outbox[0].subject)
         token = re.search(r"/b/([^/\s]+)/", mail.outbox[0].body).group(1)
         self.assertEqual(links.read_token(token), booking.reference)
+        self.assertIn("Total before tax: $354.00", mail.outbox[0].body)
         self.assertEqual(mail.outbox[1].to, ["owner@example.com"])
-        self.assertNotIn("BUY MORE", mail.outbox[1].body)
+        self.assertIn("2BR package, 3 weeks", mail.outbox[1].body)
 
-    def test_owner_email_says_when_to_buy_more(self):
-        product = bins()
-        product.planned_capacity = 150
-        product.save()  # own 100 (setUp), booking against 150
-        TimeWindow.objects.filter(pk=self.drop_window.pk).update(max_stops=3)
-        self.client.post("/book/", {"quantity": 120, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
+    def test_too_soon(self):
+        r = self.step_package(dropoff=timezone.localdate() + timedelta(days=2))
+        self.assertContains(r, "at least 3 days")
+
+    def test_rental_length_limits(self):
+        self.assertContains(self.step_package(weeks=1), "Select a valid choice")
+        self.assertContains(self.step_package(weeks=5), "Select a valid choice")
+
+    def test_not_enough_totes(self):
+        r = self.step_package("whole-home")  # 80 totes; we own 60 and have no planned capacity
+        self.assertContains(r, "We only have 60")
+
+    def test_date_without_delivery(self):
+        r = self.step_package(dropoff=self.dropoff + timedelta(days=1))
+        self.assertContains(r, "not delivering that day")
+
+    def test_extended_zone_and_too_far(self):
+        self.step_package()
+        self.client.post("/book/extras/", {"addon_totes": 0})
+        r = self.client.post("/book/addresses/", {**address("dropoff", "21702"), "pickup-unknown": "on"})
+        self.assertContains(r, "we serve within 35 miles")
+        r = self.client.post("/book/addresses/", {**address("dropoff"), **address("pickup", "20001")})
+        self.assertContains(r, "we serve within 35 miles")
+
+    def test_present_needs_a_time(self):
+        self.step_package()
+        self.client.post("/book/extras/", {"addon_totes": 0})
         self.client.post("/book/addresses/", {**address("dropoff"), "pickup-unknown": "on"})
-        self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk,
-                                          "pickup_window": self.pick_window.pk})
-        self.client.post("/book/contact/", {"name": "Big Move", "email": "big@example.com", "phone": "1"})
-        self.client.post("/book/review/")
-        owner_mail = mail.outbox[1].body
-        self.assertIn("BUY MORE", owner_mail)
-        self.assertIn("20 more", owner_mail)
+        r = self.client.post("/book/delivery/", {"presence": "present", "time_request": ""})
+        self.assertContains(r, "Let us know when you&#x27;ll be there")
 
-    def test_dropoff_too_far(self):
-        self.client.post("/book/", {"quantity": 20, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        r = self.client.post("/book/addresses/", {**address("dropoff", "21401"), "pickup-unknown": "on"})
-        self.assertContains(r, "we deliver within 30 miles")
-
-    def test_pickup_too_far(self):
-        self.client.post("/book/", {"quantity": 20, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        r = self.client.post("/book/addresses/", {**address("dropoff"), **address("pickup", "21801")})
-        self.assertContains(r, "we pick up within 60 miles")
+    def test_present_with_time_request(self):
+        self.walk(presence="present", time_request="After 10 AM please")
+        booking = Booking.objects.get()
+        self.assertEqual((booking.presence, booking.time_request), ("present", "After 10 AM please"))
+        self.assertIn("After 10 AM please", mail.outbox[1].body)
 
     def test_pickup_address_later(self):
         self.walk(pickup_unknown=True)
@@ -110,47 +147,82 @@ class BookingFlowTests(TestCase):
         url = links.booking_url(booking)
         self.assertContains(self.client.get(url), "Add your moving-in address")
 
-        r = self.client.post(url, address("pickup", "21702", line1="5 Hill Rd"))
+        r = self.client.post(url, address("pickup", "21401", line1="5 Hill Rd"))
         self.assertRedirects(r, url)
         booking.refresh_from_db()
-        self.assertEqual((booking.pickup_miles, str(booking.pickup_fee)), (55, "75.00"))
+        self.assertEqual((booking.pickup_miles, booking.delivery_fee), (26, D("25.00")))
+        self.assertEqual(booking.price_lines.filter(kind="delivery").count(), 1)
 
-    def test_too_many_bins(self):
-        r = self.client.post("/book/", {"quantity": 101, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        self.assertContains(r, "Only 100 bins are free")
-
-    def test_date_without_windows(self):
-        r = self.client.post("/book/", {"quantity": 20, "weeks": 1,
-                                        "dropoff_date": (self.dropoff + timedelta(days=1)).isoformat()})
-        self.assertContains(r, "no dropoff times left")
-
-    def test_window_fills_up_while_booking(self):
-        self.walk()  # takes the only dropoff stop
+    def test_day_fills_up(self):
+        self.walk()  # takes the only dropoff stop that day
         self.client.cookies.clear()  # a second renter
-        r = self.client.post("/book/", {"quantity": 20, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        self.assertContains(r, "no dropoff times left")
+        self.assertContains(self.step_package(), "not delivering that day, or it&#x27;s full")
 
-    def test_window_taken_between_steps(self):
-        # Renter reaches review, then someone else takes the last dropoff stop.
-        self.client.post("/book/", {"quantity": 20, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
+    def test_day_taken_between_steps(self):
+        self.step_package()
+        self.client.post("/book/extras/", {"addon_totes": 0})
         self.client.post("/book/addresses/", {**address("dropoff"), "pickup-unknown": "on"})
-        self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk, "pickup_window": self.pick_window.pk})
+        self.client.post("/book/delivery/", {"presence": "porch"})
         self.client.post("/book/contact/", {"name": "A", "email": "a@example.com", "phone": "1"})
-        other = Booking.objects.create(customer_id=None or self._customer(), dropoff_date=self.dropoff,
-                                       dropoff_address_id=self._address(), status="confirmed")
+        from rentals.models import Address, Customer
+        other = Booking.objects.create(
+            customer=Customer.objects.create(name="Other", email="o@example.com"), dropoff_date=self.dropoff,
+            dropoff_address=Address.objects.create(line1="1 X St", city="Baltimore", zip_code="21214"),
+            status="confirmed")
         Visit.objects.create(booking=other, kind="dropoff", window=self.drop_window, status="confirmed")
 
         r = self.client.post("/book/review/")
-        self.assertRedirects(r, "/book/times/")
+        self.assertRedirects(r, "/book/")
         self.assertEqual(Booking.objects.count(), 1)
 
-    def _customer(self):
-        from rentals.models import Customer
-        return Customer.objects.create(name="Other", email="o@example.com").pk
 
-    def _address(self):
-        from rentals.models import Address
-        return Address.objects.create(line1="1 X St", city="Baltimore", zip_code="21214").pk
+class PlannedCapacityFlowTests(FlowTestCase):
+    def test_owner_email_says_when_to_buy_more(self):
+        bins(planned_capacity=120)  # own 60, book as if 120
+        self.walk(package="whole-home")
+        self.assertIn("BUY MORE", mail.outbox[1].body)
+        self.assertIn("20 more", mail.outbox[1].body)
+
+
+class ReviewWindowTests(FlowTestCase):
+    def test_owner_declines(self):
+        self.walk()
+        booking = Booking.objects.get()
+        self.client.login(username="owner", password="x")
+        self.assertContains(self.client.get("/ops/"), "you can still decline")
+        r = self.client.post(f"/ops/b/{booking.reference}/decline",
+                             {"action": "decline", "reason": "We're fully booked."}, follow=True)
+        self.assertContains(r, "declined")
+        booking.refresh_from_db()
+        self.assertEqual((booking.status, booking.decline_reason), ("declined", "We're fully booked."))
+        self.assertEqual(inventory.available(bins(), self.dropoff, self.pickup), 60)
+        self.assertIn("cancelled", mail.outbox[-1].subject)
+        self.assertIn("We're fully booked.", mail.outbox[-1].body)
+
+    def test_owner_asks_for_a_change(self):
+        self.walk()
+        booking = Booking.objects.get()
+        self.client.login(username="owner", password="x")
+        self.client.post(f"/ops/b/{booking.reference}/decline",
+                         {"action": "change", "reason": "Could we drop off Saturday instead?"})
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "confirmed")
+        self.assertIn("Saturday instead", mail.outbox[-1].body)
+        self.client.logout()
+        self.assertContains(self.client.get(links.booking_url(booking)), "We need a change")
+
+    def test_cannot_decline_after_window(self):
+        self.walk()
+        with self.assertRaisesMessage(services.CannotDecline, "has passed"):
+            services.decline_booking(Booking.objects.get(), "late", now=timezone.now() + timedelta(hours=49))
+
+    def test_manual_approval_still_available(self):
+        s = BusinessSettings.load()
+        s.auto_confirm = False
+        s.save()
+        self.walk()
+        self.assertEqual(Booking.objects.get().status, Booking.Status.REQUESTED)
+        self.assertIn("We got your tote request", mail.outbox[0].subject)
 
 
 class BookingLinkTests(TestCase):
@@ -163,70 +235,6 @@ class BookingLinkTests(TestCase):
         r = self.client.post("/my-booking/", {"email": "nobody@example.com"}, follow=True)
         self.assertContains(r, "If there are bookings under nobody@example.com")
         self.assertEqual(len(mail.outbox), 0)
-
-
-class MinimumNoticeTests(TestCase):
-    def test_too_soon(self):
-        soon = timezone.localdate() + timedelta(days=2)
-        r = self.client.post("/book/", {"quantity": 20, "dropoff_date": soon.isoformat(), "weeks": 1})
-        self.assertContains(r, "We need a few days")
-
-
-
-@override_settings(MAPS_BACKEND="fake", OWNER_EMAILS=["owner@example.com"])
-class AutoConfirmTests(TestCase):
-    def setUp(self):
-        from django.contrib.auth.models import User
-
-        inventory.record_purchase(bins(), 100)
-        self.dropoff = timezone.localdate() + timedelta(days=10)
-        self.drop_window = TimeWindow.objects.create(date=self.dropoff, start=time(8), end=time(10))
-        self.pick_window = TimeWindow.objects.create(date=self.dropoff + timedelta(days=7),
-                                                     start=time(8), end=time(10))
-        User.objects.create_user("owner", password="x", is_staff=True)
-
-    def book(self, qty=40):
-        self.client.post("/book/", {"quantity": qty, "dropoff_date": self.dropoff.isoformat(), "weeks": 1})
-        self.client.post("/book/addresses/", {**address("dropoff"), "pickup-unknown": "on"})
-        self.client.post("/book/times/", {"dropoff_window": self.drop_window.pk,
-                                          "pickup_window": self.pick_window.pk})
-        self.client.post("/book/contact/", {"name": "Pat", "email": "pat@example.com", "phone": "1"})
-        self.client.post("/book/review/")
-        return Booking.objects.latest("id")
-
-    def test_renter_sees_confirmed(self):
-        booking = self.book()
-        self.assertIn("You're booked", mail.outbox[0].subject)
-        self.assertIn("to decline, do it by", mail.outbox[1].body.lower())
-        self.assertContains(self.client.get(links.booking_url(booking)), "You're booked!")
-
-    def test_owner_declines_within_window(self):
-        booking = self.book(qty=100)
-        self.assertEqual(inventory.available(bins(), self.dropoff, self.dropoff + timedelta(days=7)), 0)
-        self.client.login(username="owner", password="x")
-        self.assertContains(self.client.get("/ops/"), "you can still decline")
-        r = self.client.post(f"/ops/b/{booking.reference}/decline", {"reason": "We're fully booked."},
-                             follow=True)
-        self.assertContains(r, "declined")
-        booking.refresh_from_db()
-        self.assertEqual((booking.status, booking.decline_reason), ("declined", "We're fully booked."))
-        self.assertEqual(inventory.available(bins(), self.dropoff, self.dropoff + timedelta(days=7)), 100)
-        self.assertIn("cancelled", mail.outbox[-1].subject)
-        self.assertIn("We're fully booked.", mail.outbox[-1].body)
-        self.assertEqual(booking.visits.filter(status="cancelled").count(), 2)
-
-    def test_cannot_decline_after_window(self):
-        booking = self.book()
-        with self.assertRaisesMessage(services.CannotDecline, "has passed"):
-            services.decline_booking(booking, "late", now=timezone.now() + timedelta(hours=25))
-
-    def test_manual_approval_still_available(self):
-        settings = BusinessSettings.load()
-        settings.auto_confirm = False
-        settings.save()
-        booking = self.book()
-        self.assertEqual(booking.status, Booking.Status.REQUESTED)
-        self.assertIn("We got your tote request", mail.outbox[0].subject)
 
 
 class EmailEscapingTests(TestCase):

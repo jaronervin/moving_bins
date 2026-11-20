@@ -14,7 +14,9 @@ from .models import (
     Charge,
     CheckIn,
     Customer,
-    PricePoint,
+    Package,
+    PackageItem,
+    PriceLine,
     Product,
     Signature,
     StockMovement,
@@ -28,14 +30,15 @@ from .models import (
 @admin.register(BusinessSettings)
 class BusinessSettingsAdmin(admin.ModelAdmin):
     fieldsets = [
-        ("Base", {"fields": ["base_address", "base_lat", "base_lng"]}),
-        ("Service area", {"fields": ["dropoff_max_miles", "pickup_free_miles",
-                                     "pickup_max_miles", "pickup_rate_per_mile"]}),
-        ("Holds, cancellation, payment", {"fields": ["auto_confirm", "review_hours", "min_notice_days", "hold_hours", "cancel_cutoff_hours",
-                                                     "late_cancel_charge_percent",
-                                                     "authorize_hours_before_dropoff"]}),
-        ("Operations", {"fields": ["check_in_deadline_days", "purchase_lead_days", "vehicle_capacity",
-                                    "boxes_per_bin", "contents_retention_days"]}),
+        ("Contact (shown on the site)", {"fields": ["contact_email", "contact_phone"]}),
+        ("Service area", {"fields": ["base_address", "base_lat", "base_lng", "free_radius_miles",
+                                     "max_radius_miles", "extended_zone_fee"]}),
+        ("Rental length", {"fields": ["min_weeks", "max_weeks"]}),
+        ("Booking, review and cancellation", {"fields": [
+            "auto_confirm", "review_hours", "min_notice_days", "hold_hours", "cancel_cutoff_hours",
+            "late_cancel_charge_percent", "authorize_hours_before_dropoff"]}),
+        ("Operations", {"fields": ["check_in_deadline_days", "purchase_lead_business_days",
+                                    "vehicle_capacity", "boxes_per_bin", "contents_retention_days"]}),
     ]
 
     def has_add_permission(self, request):
@@ -45,16 +48,25 @@ class BusinessSettingsAdmin(admin.ModelAdmin):
         return False
 
 
-class PricePointInline(admin.TabularInline):
-    model = PricePoint
+class PackageItemInline(admin.TabularInline):
+    model = PackageItem
     extra = 0
+
+
+@admin.register(Package)
+class PackageAdmin(admin.ModelAdmin):
+    list_display = ["name", "totes", "price", "extra_week_price", "active", "sort_order"]
+    list_editable = ["price", "extra_week_price", "active", "sort_order"]
+    prepopulated_fields = {"slug": ["name"]}
+    inlines = [PackageItemInline]
 
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["name", "is_rentable", "active", "ready", "out", "awaiting", "out_of_service", "retired"]
+    list_display = ["name", "kind", "price", "active", "track_stock", "ready", "out", "awaiting",
+                    "out_of_service", "retired"]
+    list_filter = ["kind", "active"]
     prepopulated_fields = {"slug": ["name"]}
-    inlines = [PricePointInline]
     readonly_fields = ["stock_summary"]
 
     def _count(self, obj, state):
@@ -123,6 +135,11 @@ class BookingLineInline(admin.TabularInline):
     extra = 0
 
 
+class PriceLineInline(admin.TabularInline):
+    model = PriceLine
+    extra = 0
+
+
 class VisitInline(admin.StackedInline):
     model = Visit
     extra = 0
@@ -148,7 +165,7 @@ class BookingAdmin(admin.ModelAdmin):
     readonly_fields = ["reference", "pickup_date", "created_at", "updated_at"]
     autocomplete_fields = ["customer"]
     raw_id_fields = ["dropoff_address", "pickup_address"]
-    inlines = [BookingLineInline, VisitInline, ChargeInline, CheckInInline]
+    inlines = [PriceLineInline, BookingLineInline, VisitInline, ChargeInline, CheckInInline]
 
     @admin.display(description="Units")
     def bins(self, obj):

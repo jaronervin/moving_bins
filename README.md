@@ -15,28 +15,30 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate        # creates db.sqlite3 with the bin product and prices
-python manage.py seed_dev       # 100 coded bins on the shelf + weekend delivery windows
+python manage.py seed_dev       # 60 totes in service, 90 reserved codes, a delivery window every day
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
 - Owner tools (log in first): http://127.0.0.1:8000/ops/ (phones only allow the camera on
   `https://` sites or `localhost`, so the scanner's camera works once deployed; typing codes works anywhere)
-- Quote page: http://127.0.0.1:8000/
+- Home page with packages: http://127.0.0.1:8000/
 - Book: http://127.0.0.1:8000/book/
 - Owner admin: http://127.0.0.1:8000/admin/
 
 Locally:
 - the database is a SQLite file (set `DATABASE_URL` to use Postgres, as production does);
 - emails are printed in the terminal running `runserver`, including the renter's private link;
-- distances are made up from a small ZIP table in `rentals/maps.py` (e.g. 21218 = 4 mi,
-  21401 = 35 mi, 21702 = 55 mi, 21801 = 125 mi; other ZIPs = 10 mi).
+- distances are made up from a small ZIP table in `rentals/maps.py` (e.g. 21218 = 4 mi free,
+  21401 = 26 mi outer zone, 20001 = 36 mi refused; other ZIPs = 10 mi).
 
-### Real distances (Google Maps)
+### Real addresses (Google Maps)
+
+The service area is a straight-line radius, so only address lookup is needed.
 
 1. Create a Google Cloud project with billing enabled.
-2. Enable the **Geocoding API** and the **Routes API**.
-3. Create an API key, restricted to those two APIs.
+2. Enable the **Geocoding API**.
+3. Create an API key, restricted to that API.
 4. Run with `MAPS_BACKEND=google GOOGLE_MAPS_API_KEY=...`.
 
 ## Tests
@@ -57,7 +59,7 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | File | What's in it |
 |---|---|
 | `rentals/models.py` | All the tables, with notes on each |
-| `rentals/pricing.py` | Volume rates, pickup fee, late-cancel and damage charges (pure functions) |
+| `rentals/pricing.py` | Packages, extra totes, extras, delivery zone, late-cancel and damage charges (pure functions) |
 | `rentals/inventory.py` | Stock counts from the ledger, availability by date, dropoff/pickup/check-in |
 | `rentals/services.py` | Placing a hold without overbooking; expiring holds |
 | `rentals/windows.py` | Weekly window pattern → dated delivery windows; open windows with room |
@@ -73,6 +75,17 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/management/commands/create_codes.py` | Create tote codes ahead of time for sticker printing |
 | `rentals/management/commands/export_stickers.py` | Print-ready sticker PDF (2", 1/8" bleed, one per page) + CSV for a label printer |
 | `rentals/tests/` | Tests for all of the above |
+
+## Before launch: placeholders to replace
+
+All in the admin (Business settings, Products, Packages):
+
+- [ ] **Phone number:** 703-703-2511 is a placeholder and shows in every page's footer.
+- [ ] **20–35 mile fee:** $25 per address is a placeholder.
+- [ ] **Dish/glass divider:** $15 is a placeholder (quoted as $15–30).
+- [ ] **Whole Home:** $249 assumed; Katie may prefer $299.
+- [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
+- [ ] **Extras stock:** turn on "track stock" for each extra once counted.
 
 ## Progress
 

@@ -1,0 +1,14 @@
+{% if quote %}
+<section class="card summary">
+  <h2>Your order</h2>
+  <table>
+    {% for line in quote.lines %}
+    <tr><td>{% if line.quantity > 1 %}{{ line.quantity }} × {% endif %}{{ line.description }}</td>
+        <td class="num">${{ line.amount }}</td></tr>
+    {% endfor %}
+    {% if not draft.dropoff %}<tr><td class="muted">Delivery</td><td class="num muted">Free within {{ settings.free_radius_miles }} mi</td></tr>{% endif %}
+    <tr class="total"><td>Total before tax</td><td class="num">${{ quote.total_before_tax }}</td></tr>
+  </table>
+  <p class="muted">Nothing is charged until your totes are dropped off.</p>
+</section>
+{% endif %}

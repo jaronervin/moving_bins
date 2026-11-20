@@ -2,11 +2,16 @@ from datetime import date
 
 from decimal import Decimal
 
-from rentals.models import Address, Booking, Customer, PricePoint, Product
+from rentals.models import Address, Booking, Customer, Product
 
 
-def bins():
-    return Product.objects.get(slug="bin-27gal")
+def bins(planned_capacity=None):
+    """The tote product. Tests book against what they own unless they set a planned capacity."""
+    p = Product.objects.get(slug="bin-27gal")
+    if p.planned_capacity != planned_capacity:
+        p.planned_capacity = planned_capacity
+        p.save(update_fields=["planned_capacity"])
+    return p
 
 
 def make_booking(dropoff=date(2027, 1, 9), weeks=1, **kwargs):
@@ -18,12 +23,10 @@ def make_booking(dropoff=date(2027, 1, 9), weeks=1, **kwargs):
 
 def blankets():
     """A counted (not individually tracked) product, for ledger tests."""
-    p, created = Product.objects.get_or_create(
-        slug="blanket", defaults={"name": "Moving blanket", "replacement_price": Decimal("10"),
-                                  "lid_replacement_price": Decimal("5"),
-                                  "spare_lid_product": Product.objects.get(slug="spare-lid-27gal")})
-    if created:
-        PricePoint.objects.create(product=p, quantity=1, unit_rate=Decimal("2.00"))
+    p, _ = Product.objects.get_or_create(
+        slug="test-blanket", defaults={"name": "Moving blanket", "replacement_price": Decimal("10"),
+                                       "lid_replacement_price": Decimal("5"), "track_stock": True,
+                                       "spare_lid_product": Product.objects.get(slug="spare-lid-27gal")})
     return p
 
 

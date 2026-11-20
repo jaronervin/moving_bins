@@ -1,7 +1,4 @@
-from datetime import timedelta
-
 from django.test import TestCase
-from django.utils import timezone
 
 from rentals import inventory
 
@@ -10,20 +7,29 @@ from .helpers import bins
 
 class HomePageTests(TestCase):
     def setUp(self):
-        inventory.record_purchase(bins(), 100)
+        inventory.record_purchase(bins(), 60)
 
-    def test_shows_rate_table(self):
+    def test_shows_packages_and_add_ons(self):
         r = self.client.get("/")
-        self.assertContains(r, "$4.50")
-        self.assertContains(r, "$300.00")
+        for text in ("Studio/1BR", "$119", "2BR", "$169", "3BR", "$229", "Whole Home", "$249",
+                     "80 totes", "3 dollies", "1 hand truck", "1 dolly", "Appliance dolly", "Packing kit",
+                     "$5 each for 2 weeks, then $3/week"):
+            self.assertContains(r, text)
 
-    def test_quote(self):
-        d = (timezone.localdate() + timedelta(days=10)).isoformat()
-        r = self.client.get("/", {"quantity": 35, "dropoff_date": d, "weeks": 2})
-        self.assertContains(r, "$324.10")
-        self.assertContains(r, "100 bins free")
+    def test_footer_contact(self):
+        r = self.client.get("/")
+        self.assertContains(r, "hello@sprouttoteco.com")
+        self.assertContains(r, "703-703-2511")
 
-    def test_below_minimum(self):
-        d = (timezone.localdate() + timedelta(days=10)).isoformat()
-        r = self.client.get("/", {"quantity": 5, "dropoff_date": d, "weeks": 1})
-        self.assertContains(r, "minimum order is 20")
+
+class CountedTests(TestCase):
+    def test_plurals(self):
+        from rentals.models import counted
+
+        cases = {(1, "Dolly"): "1 dolly", (3, "Dolly"): "3 dollies",
+                 (45, "27-gallon tote with lid"): "45 27-gallon totes with lid",
+                 (2, "Mattress bag (Queen/King)"): "2 mattress bags (Queen/King)",
+                 (2, "Floor runner & door jamb guards"): "2 floor runner & door jamb guards",
+                 (2, "Wardrobe box"): "2 wardrobe boxes", (1, "Hand truck"): "1 hand truck"}
+        for (q, name), expected in cases.items():
+            self.assertEqual(counted(q, name), expected)

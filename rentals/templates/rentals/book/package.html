@@ -1,0 +1,46 @@
+{% extends "rentals/base.html" %}
+{% block title %}Book totes · Sprout Tote Co.{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<form method="post">{% csrf_token %}
+  {{ form.non_field_errors }}
+  <h2>Choose a package</h2>
+  {{ form.package.errors }}
+  <div class="packages">
+    {% for p in packages %}
+    <label class="package">
+      <input type="radio" name="package" value="{{ p.pk }}"
+        {% if form.package.value|stringformat:"s" == p.pk|stringformat:"s" %}checked{% endif %} required>
+      <span class="package-name">{{ p.name }}</span>
+      <span class="package-price">${{ p.price|floatformat:"-2" }}</span>
+      <span class="muted">{{ settings.min_weeks }} weeks · +${{ p.extra_week_price|floatformat:"-2" }}/extra week</span>
+      <span class="package-items"><b>{{ p.totes }} totes</b>{% for item in p.items.all %} · {{ item.label }}{% endfor %}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <p class="muted">Every rental includes color-coded labels, zip ties and a marker, plus free dropoff and pickup
+    within {{ settings.free_radius_miles }} miles. Need more totes? Add them on the next step.</p>
+  <div class="grid">
+    <section class="card">
+      {{ form.weeks.label_tag }} {{ form.weeks }} {{ form.weeks.errors }}
+      {{ form.dropoff_date.label_tag }} {{ form.dropoff_date }} {{ form.dropoff_date.errors }}
+      {% if suggestions %}
+        <p class="muted">Next days we deliver:
+          {% for d in suggestions %}{{ d|date:"D M j" }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+      <p class="muted">Need it sooner or shorter than {{ settings.min_weeks }} weeks?
+        <a href="mailto:{{ settings.contact_email }}">Contact us</a>.</p>
+      <button type="submit">Continue</button>
+    </section>
+    <section class="card">
+      <h2>Good to know</h2>
+      <ul class="plain">
+        <li>Totes come with lids and stack neatly.</li>
+        <li>We drop off at the place you're leaving and pick up at your new place.</li>
+        <li>Nothing is charged until your totes are dropped off.</li>
+        <li>Free cancellation up to {{ settings.cancel_cutoff_hours }} hours before dropoff.</li>
+      </ul>
+    </section>
+  </div>
+</form>
+{% endblock %}

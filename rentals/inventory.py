@@ -126,13 +126,13 @@ def purchase_needs(product, today=None, horizon_days=120, now=None):
     if not short_days:
         return None
     first = min(short_days)
-    lead = BusinessSettings.load().purchase_lead_days
+    order_by = pricing.business_days_before(first, BusinessSettings.load().purchase_lead_business_days)
     return {
         "product": product,
         "short": max(short_days.values()),
         "first_date": first,
-        "order_by": first - timedelta(days=lead),
-        "late": first - timedelta(days=lead) < today,
+        "order_by": order_by,
+        "late": order_by < today,
         "owned": owned,
     }
 
@@ -205,19 +205,30 @@ def record_purchase(product, quantity, user=None, note=""):
 
 @transaction.atomic
 def record_dropoff(booking, user=None):
-    """Counted items leave the shelf for the renter's house.
+    """Counted items leave the shelf for the renter's house; sale items leave for good.
 
-    Individually tracked bins are handled by scanning (rentals.bins).
+    Individually tracked bins are handled by scanning (rentals.bins). Items
+    whose stock isn't tracked yet are skipped.
     """
-    for line in booking.lines.select_related("product").filter(product__is_serialized=False):
-        _move(line.product, line.quantity, StockState.READY, StockState.OUT,
-              StockMovement.Reason.DROPOFF, booking=booking, user=user)
+    from .models import Product
+
+    lines = booking.lines.select_related("product").filter(product__is_serialized=False,
+                                                           product__track_stock=True)
+    for line in lines:
+        sold = line.product.kind == Product.Kind.SALE
+        _move(line.product, line.quantity, StockState.READY, None if sold else StockState.OUT,
+              StockMovement.Reason.SOLD if sold else StockMovement.Reason.DROPOFF,
+              booking=booking, user=user)
 
 
 @transaction.atomic
 def record_pickup(booking, user=None):
     """Counted items come back from the renter and wait to be cleaned and inspected."""
-    for line in booking.lines.select_related("product").filter(product__is_serialized=False):
+    from .models import Product
+
+    lines = booking.lines.select_related("product").filter(
+        product__is_serialized=False, product__track_stock=True).exclude(product__kind=Product.Kind.SALE)
+    for line in lines:
         _move(line.product, line.quantity, StockState.OUT, StockState.AWAITING_CHECK_IN,
               StockMovement.Reason.PICKUP, booking=booking, user=user)
 
@@ -293,7 +304,7 @@ def impact_stats():
     """Running totals for the homepage: moves served, bin-weeks, boxes avoided."""
     done = Booking.objects.filter(status__in=[Booking.Status.OUT, Booking.Status.PICKED_UP,
                                               Booking.Status.CLOSED])
-    lines = BookingLine.objects.filter(booking__in=done, product__is_rentable=True)
+    lines = BookingLine.objects.filter(booking__in=done, product__kind="tote")
     sets_rented = lines.aggregate(n=Sum("quantity"))["n"] or 0
     bin_weeks = sum(line.quantity * line.booking.total_weeks for line in lines.select_related("booking"))
     boxes = int(sets_rented * BusinessSettings.load().boxes_per_bin)

@@ -1,48 +1,21 @@
-from datetime import timedelta
-
 from django.contrib import messages
 from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 
 from . import emails, inventory, links, maps, pricing, services, totes
-from .forms import FindBookingForm, PickupAddressForm, QuoteForm
-from .models import Booking, BusinessSettings, Product
+from .forms import FindBookingForm, PickupAddressForm
+from .models import Booking, BusinessSettings, Package, Product
 
 
 def home(request):
-    """Landing page with the quote calculator and impact numbers."""
-    bins = get_object_or_404(Product, slug="bin-27gal", active=True)
-    form = QuoteForm(request.GET or None, minimum_quantity=bins.minimum_quantity,
-                     min_notice_days=BusinessSettings.load().min_notice_days)
-    quote = available = pickup_date = error = None
-
-    if form.is_valid():
-        qty = form.cleaned_data["quantity"]
-        dropoff = form.cleaned_data["dropoff_date"]
-        weeks = form.cleaned_data["weeks"]
-        pickup_date = dropoff + timedelta(days=7 * weeks)
-        available = inventory.available(bins, dropoff, pickup_date)
-        try:
-            quote = services.quote([(bins, qty)], weeks)
-        except pricing.PricingError as exc:
-            error = str(exc)
-        if quote and qty > available:
-            error = f"Only {available} bins are free for those dates."
-
+    """Landing page: the packages, extras and impact numbers."""
     return render(request, "rentals/home.html", {
-        "form": form,
-        "product": bins,
-        "quote": quote,
-        "available": available,
-        "pickup_date": pickup_date,
-        "error": error,
+        "packages": Package.objects.filter(active=True).prefetch_related("items__product"),
+        "rentals": Product.objects.filter(active=True, kind=Product.Kind.RENTAL),
+        "sales": Product.objects.filter(active=True, kind=Product.Kind.SALE),
+        "tote": Product.objects.filter(kind=Product.Kind.TOTE, active=True).first(),
         "settings": BusinessSettings.load(),
         "impact": inventory.impact_stats(),
-        "rate_table": [
-            (n, pricing.to_cents(pricing.unit_rate(services.price_points(bins), n)),
-             pricing.weekly_total(services.price_points(bins), n))
-            for n in (20, 40, 60, 80, 100)
-        ],
     })
 
 
@@ -74,7 +47,8 @@ def booking_detail(request, token):
             address = {k: pickup_form.cleaned_data.get(k, "")
                        for k in ("line1", "line2", "city", "state", "zip_code")}
             try:
-                place, miles = maps.lookup(address, BusinessSettings.load().base_address)
+                s = BusinessSettings.load()
+                place, miles = maps.lookup(address, s.base_lat, s.base_lng)
                 services.set_pickup_address(
                     booking, {**address, "lat": place.lat, "lng": place.lng,
                               "place_id": place.place_id}, miles)
@@ -85,16 +59,14 @@ def booking_detail(request, token):
             except maps.MapsUnavailable as exc:
                 messages.error(request, str(exc))
 
-    lines = list(booking.lines.select_related("product"))
-    weekly = sum((line.locked_weekly_total for line in lines), pricing.to_cents(0))
-    rental = weekly * booking.weeks
+    price_lines = list(booking.price_lines.all())
     return render(request, "rentals/booking_detail.html", {
         "booking": booking,
-        "lines": lines,
+        "lines": list(booking.lines.select_related("product")),
+        "price_lines": price_lines,
         "visits": {v.kind: v for v in booking.visits.select_related(
             "requested_window", "proposed_window", "window")},
-        "rental": rental,
-        "total": rental + booking.pickup_fee,
+        "total": sum((l.amount for l in price_lines), pricing.to_cents(0)),
         "pickup_form": pickup_form,
         "settings": BusinessSettings.load(),
         "totes": totes.totes_for(booking),

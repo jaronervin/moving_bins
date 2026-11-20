@@ -30,55 +30,49 @@ Launch target: **beginning of 2027**.
 ## 2. Business rules
 
 ### 2.1 Rental period
-- Rentals run in **7-day blocks**. Renter picks a dropoff date and a number
-  of weeks; pickup date = dropoff date + 7 × weeks.
-- If bins aren't ready at pickup, the owner marks the pickup **missed** and
-  the rental **auto-renews for one more week** at the rate locked in at
-  booking (no second pickup fee). This can repeat.
+- Rentals are **2, 3 or 4 weeks** online (settings: min 2, max 4). Shorter or
+  longer: renters contact us. Pickup date = dropoff date + 7 × weeks.
+- If totes aren't ready at pickup (with an any-time-that-day grace period),
+  the rental **auto-renews for one week** at the renewal price locked in at
+  booking: the package's extra-week price plus $3 per extra tote. Repeats.
 
-### 2.2 Bin pricing (per week)
-- Minimum order: **20 bins**. Any whole number above 20 is allowed, up to
-  what's available.
-- **Whole-order volume pricing**: the per-bin rate depends on the total count
-  and applies to every bin in the order.
-- Rate slides in a straight line from **$5.00 at 20 bins** to **$3.00 at 100
-  bins**, and stays at $3.00 above 100:
+### 2.2 Packages and prices
+Every rental starts from a package (prices for 2 weeks, from Katie's sheet):
 
-  `rate(n) = 5.00 − 0.025 × (n − 20)` for 20 ≤ n ≤ 100, rounded to the cent
+| Package | Totes | Included | 2 weeks | Extra week |
+|---|---:|---|---:|---:|
+| Studio/1BR | 20 | 1 dolly | $119 | $45 |
+| 2BR | 40 | 2 dollies | $169 | $65 |
+| 3BR | 60 | 2 dollies | $229 | $85 |
+| Whole Home | 80 | 3 dollies, 1 hand truck | $249 | $99 |
 
-  `weekly total = n × rate(n)` (so the receipt math always checks out)
-
-| Bins | Per bin | Weekly total |
-|---:|---:|---:|
-| 20 | $5.00 | $100.00 |
-| 35 | $4.63 | $162.05 |
-| 40 | $4.50 | $180.00 |
-| 60 | $4.00 | $240.00 |
-| 80 | $3.50 | $280.00 |
-| 100 | $3.00 | $300.00 |
-
-  The total always increases with quantity, so a bigger order never costs
-  less than a smaller one.
-
-- **How it's stored:** each product has a list of price points
-  `(quantity, per-unit rate)`; the rate is interpolated linearly between
-  points and held flat past the last one. Bins = `[(20, 5.00), (100, 3.00)]`.
-  A flat-priced item (e.g. a dolly at $15/week) is a single point.
-- The per-bin rate is **locked at booking** and reused for renewals.
+- **Extra totes:** $5 each for the first 2 weeks, then $3 per tote per extra
+  week. Priced so a package plus extra totes never undercuts the next
+  package up, for 2, 3 or 4 weeks (tested).
+- **Every rental includes** color-coded labels, zip ties and a marker.
+- **Rental extras**, one-time fee per rental (priced near cost, so two uses
+  pay for them): dolly $10, hand truck $15, appliance dolly $25, moving
+  blanket $5, wardrobe box $15, dish/glass divider $15 (**placeholder**;
+  quoted as $15–30), floor runner & door jamb guards $25.
+- **For sale:** mattress bag Queen/King $10, Twin/Full $8, packing kit
+  (kraft paper, honeycomb wrap, paper tape) $35, foam pouch $1.
+- All prices, packages and contents are editable in admin. Prices are
+  **locked at booking** as price lines.
+- Stock for extras isn't checked until counts are entered (each product has
+  a "track stock" switch).
 
 ### 2.3 Service area & delivery fees
-All distances are **driving miles** from the business base (for now, the
-center of ZIP **21214**; replace with the real address in settings).
+Straight-line distance ("radius") from base (approx. center of ZIP 21214;
+replace with the real address in settings):
 
-| | Within 30 mi | 30–60 mi | Over 60 mi |
-|---|---|---|---|
-| **Dropoff** (moving-out address) | Free | Not accepted | Not accepted |
-| **Pickup** (moving-in address) | Free | **$3 per mile over 30** | Not accepted |
+| Distance | Dropoff and pickup |
+|---|---|
+| Up to 20 mi | Free |
+| 20–35 mi | **$25 per address** (**placeholder**; real amount to come) |
+| Over 35 mi | Not served online |
 
-- Miles are rounded to the nearest whole mile. Example: pickup 42 mi away
-  → 12 × $3 = **$36**.
-- Fee is charged once, with the rental. Renewals don't add it again.
-- All of these (base, radius, $/mile, max) are settings, not code.
+A city list may be added later. Addresses are looked up with Google
+Geocoding; no driving-distance service is needed.
 
 ### 2.4 Sales tax
 Collected via **Stripe Tax**. Whether the delivery fee is taxable in Maryland
@@ -86,17 +80,13 @@ is a question for an accountant; Stripe handles it once the right tax code is
 set per line item.
 
 ### 2.5 Cancellation & changes
-- Cancel **48+ hours** before the dropoff window starts → nothing charged.
-- Cancel **inside 48 hours** → the card is charged **50% of the rental**
-  (plus tax on that amount). No pickup fee, since that trip never happens.
-- Nothing is charged before dropoff (§6.1), so cancelling earlier just
-  releases the hold. No refunds needed.
-- Changes (quantity, dates, windows, addresses) are allowed until the same
-  48-hour cutoff. Changes to dates/windows go back to the owner for approval.
-  Since nothing is charged until dropoff, the new price simply replaces the
-  old one.
-- **Early pickup:** renters may ask for an earlier pickup if they finish
-  early (owner approves the window). No refund for unused days.
+- Cancel **72+ hours** before dropoff → nothing charged.
+- Cancel **inside 72 hours** → **50% of the rental** (package, extra totes,
+  rental extras) plus tax. No delivery fee or sale items.
+- Nothing is charged before dropoff (§6.1), so no refunds are needed.
+- Changes allowed until the same 72-hour cutoff. Minimum notice to book is
+  also 3 days (72 hours), matching the ~3 business days to buy more totes.
+- **Early pickup:** allowed at the renter's convenience, no refund.
 
 ### 2.6 Damage & loss
 - Damage is assessed at **check-in** (§4.2), not at the door, so it's done
@@ -132,37 +122,32 @@ set per line item.
 ```
 
 ### 3.1 Renter flow (no accounts / passwords)
-1. **Quote** — pick quantity, dropoff date, number of weeks. Availability and
-   price update live. Dropoff must be at least **3 days** out (setting), so
-   there's time to confirm before the 48-hour cancellation cutoff.
-2. **Addresses** — moving-out (dropoff) and moving-in (pickup), with address
-   autocomplete. Distances checked immediately; out-of-range is rejected with
-   a clear message; pickup fee shown.
-   - The **moving-in address can be left blank** at booking ("I don't know
-     yet"). The renter is reminded by email until they add it. **No dropoff
-     happens without it**. The owner sees a "missing pickup address" flag,
-     and the dropoff can't be marked done until the address is in.
-   - The pickup fee is quoted once the address is added, and charged with
-     the rental at dropoff.
-3. **Time windows** — choose a preferred dropoff window and pickup window
-   from the windows the owners have published for those dates.
-4. **Contact** — name, email, phone, porch/access notes.
-5. **Card** — Stripe-hosted form in *setup* mode: the card is verified and
-   saved, **nothing is charged yet**. Billing address collected for address
-   verification (AVS).
-6. **Sign** — read the agreement, tick the box, type full name. Typed name
-   must match the name on the payment method (ignoring case/spacing).
-7. **Booked**: status `confirmed` right away (auto-confirm, §3.2). Renter
-   gets a "You're booked" email with a private link to view, change or
-   cancel the booking.
+1. **Package**: pick a package, 2/3/4 weeks, and a dropoff date at least 3
+   days out on a day we deliver. Tote availability is checked here.
+2. **Extras**: extra totes, rental extras, items for sale. A running order
+   summary shows on every step from here.
+3. **Addresses**: moving-out (dropoff) and moving-in (pickup). Out of range is
+   refused; outer-zone fees are added.
+   - The moving-in address can be left blank and added later from the
+     booking page. **No dropoff happens without it.**
+4. **Delivery**: each delivery day has a "delivered by" time (e.g. by 1 PM);
+   pickups say "have totes ready by" the start time. Renter chooses **leave
+   at the door/porch (their risk)** or **I'll be there**, with an optional
+   specific-time request (required if they'll be there).
+5. **Contact**: name, email, phone, notes.
+6. **Card** and **agreement** (coming): card saved, nothing charged; typed
+   signature must match the card name.
+7. **Booked**: confirmed right away (§3.2). Renter gets a "You're booked"
+   email with a private link to view, change or cancel.
 
 ### 3.2 Owner response
 
 **Auto-confirm (default):** a submitted booking is **confirmed immediately**
-with the windows the renter chose, so renters never wait on "pending
-approval". The owners get an email and have **24 hours to decline**
-(setting) from the owner page, with a short reason emailed to the renter.
-Nothing has been charged yet, so a decline costs the renter nothing. After 24
+for the days the renter chose, so renters never wait on "pending approval".
+The owners get an email and have **48 hours** (setting) on the owner page to
+**decline** it or **ask for a change** (e.g. a different day), with a
+message emailed to the renter and shown on their booking page.
+Nothing has been charged yet, so a decline costs the renter nothing. After 48
 hours, changes happen by agreement with the renter like any confirmed booking.
 
 **Manual approval (setting off):** the original flow. The request holds the
@@ -379,8 +364,9 @@ cancelled, hold expired.
 
 | Table | Key fields |
 |---|---|
-| `Product` | name, slug, active, replacement_price, part_replacement_price (lid), stripe_tax_code |
-| `PricePoint` | product, min_quantity, unit_rate |
+| `Product` | name, kind (tote/rental/sale/part), price, addon_price, addon_extra_week_price, track_stock, replacement prices |
+| `Package` / `PackageItem` | name, totes, price, extra_week_price; included items (dollies, hand truck) |
+| `PriceLine` | booking, kind, description, quantity, unit_price, amount (locked at booking) |
 | `StockMovement` | product, quantity, from_state, to_state, booking (optional), reason, note, created_at |
 | `Customer` | name, email, phone, stripe_customer_id |
 | `Address` | line1, line2, city, state, zip, lat, lng, place_id |
@@ -435,27 +421,26 @@ availability and fees.
 
 ## 12. Things the owners need to set up
 
-- [ ] Business name + domain
+- [x] Business name + domain (Sprout Tote Company, sprouttoteco.com)
 - [ ] Stripe account (enable 2FA); Stripe Tax registration
 - [ ] Maryland sales tax registration (confirm with an accountant)
-- [ ] Google Cloud account with billing enabled (for the Maps API key)
-- [ ] Email sending provider (needs the domain)
+- [ ] Google Cloud account with billing enabled (for the Geocoding API key)
+- [ ] Email sending provider; `hello@sprouttoteco.com`
 - [ ] Hosting account (Render or Railway)
 - [ ] Exact base address (replaces ZIP 21214 center)
 - [ ] Liability insurance / business entity (worth asking about)
+
+**Placeholders to replace before launch:** phone 703-703-2511; 20–35 mile
+fee $25; dish/glass divider $15; Whole Home $249 (pending Katie); stock
+counts for extras.
 
 ---
 
 ## 13. Open questions
 
-None right now.
-
-Decided:
-- Late cancellation → 50% of rental charged (§2.5).
-- Missing/broken bin → $10; lid only → $5 (§2.6).
-- Nothing charged until dropoff; late cancel charges 50% (§6.1).
-- 2.5 boxes per bin for impact stats (§5.1).
-- Vehicle fits all 100 (§5).
-- Windows: configurable, tuned to demand (§5).
-- Booking allowed without moving-in address; no dropoff without it (§3.1).
-- Early pickup allowed, no refund (§2.5).
+1. Whole Home: $249 (assumed) or $299?
+2. Fee for the 20–35 mile zone.
+3. Dish/glass divider: one price or sizes?
+4. How many of each rental extra you own (to turn on stock checks).
+5. City list for the service area: replace or supplement the radius?
+6. Real phone number.

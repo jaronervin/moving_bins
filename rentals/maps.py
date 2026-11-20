@@ -1,15 +1,16 @@
 """
-Address lookup and driving distances.
+Address lookup and distance from base.
+
+The service area is a straight-line radius around base, so all we need from a
+map service is each address's coordinates (geocoding); the distance is then
+plain geometry (rentals.pricing.straight_line_miles).
 
 Two interchangeable backends, chosen by the MAPS_BACKEND setting:
 
-* GoogleMaps — the real thing. Uses the Geocoding API to confirm an address
-  and the Routes API for driving distance from base. Needs GOOGLE_MAPS_API_KEY.
-* FakeMaps — for local development and tests. No network. Distances come from
-  a rough table of ZIP codes (driving miles from 21214); unknown ZIPs are 10
-  miles. Never used in production.
-
-Both return the same things, so the rest of the code doesn't care which runs.
+* GoogleMaps: the Google Geocoding API. Needs GOOGLE_MAPS_API_KEY.
+* FakeMaps: for local development and tests. No network. Places each address
+  due north of base at a distance taken from a rough table of ZIP codes
+  (unknown ZIPs are 10 miles). Never used in production.
 """
 
 import hashlib
@@ -22,7 +23,6 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 
-METERS_PER_MILE = 1609.344
 
 
 class AddressNotFound(Exception):
@@ -49,27 +49,25 @@ def one_line(address):
 
 
 class FakeMaps:
-    # Rough driving miles from 21214. Good enough to click around with.
+    # Rough straight-line miles from 21214. Good enough to click around with.
     ZIP_MILES = {
         "21214": 0, "21206": 3, "21234": 4, "21218": 4, "21239": 3, "21212": 5,
-        "21201": 7, "21230": 9, "21224": 7, "21093": 12, "21228": 14, "21043": 18,
-        "21044": 25, "21045": 24, "21061": 20, "21401": 35, "21403": 37,
-        "20001": 45, "21701": 52, "21702": 55, "17401": 55, "21801": 125,
+        "21201": 6, "21230": 8, "21224": 6, "21093": 9, "21228": 12, "21043": 15,
+        "21044": 18, "21045": 17, "21061": 14, "21401": 26, "21403": 28,
+        "20001": 36, "21701": 46, "21702": 48, "17401": 42, "21801": 90,
     }
 
-    def geocode(self, address):
+    def geocode(self, address, near=None):
         if not address.get("line1") or not address.get("zip_code"):
             raise AddressNotFound("Please enter a street address and ZIP code.")
-        return Place(formatted=one_line(address), place_id=f"fake:{address['zip_code']}")
-
-    def driving_miles(self, origin, place):
-        zip_code = place.place_id.removeprefix("fake:")
-        return float(self.ZIP_MILES.get(zip_code, 10))
+        lat0, lng0 = near or (39.352, -76.563)
+        miles = self.ZIP_MILES.get(address["zip_code"][:5], 10)
+        return Place(formatted=one_line(address), lat=float(lat0) + miles / 69.05, lng=float(lng0),
+                     place_id=f"fake:{address['zip_code']}")
 
 
 class GoogleMaps:
     GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
-    ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
     # Results precise enough to deliver to.
     PRECISE_TYPES = {"street_address", "premise", "subpremise"}
 
@@ -83,7 +81,7 @@ class GoogleMaps:
         except Exception as exc:  # network error, HTTP error, bad JSON
             raise MapsUnavailable("The map service didn't respond. Please try again.") from exc
 
-    def geocode(self, address):
+    def geocode(self, address, near=None):
         query = urllib.parse.urlencode(
             {"address": one_line(address), "components": "country:US", "key": self.api_key}
         )
@@ -99,23 +97,6 @@ class GoogleMaps:
         return Place(formatted=best["formatted_address"], lat=loc["lat"], lng=loc["lng"],
                      place_id=best["place_id"])
 
-    def driving_miles(self, origin, place):
-        body = json.dumps({
-            "origin": {"address": origin},
-            "destination": {"placeId": place.place_id},
-            "travelMode": "DRIVE",
-        }).encode()
-        req = urllib.request.Request(self.ROUTES_URL, data=body, method="POST", headers={
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": "routes.distanceMeters",
-        })
-        data = self._request(req)
-        routes = data.get("routes") or []
-        if not routes:
-            raise AddressNotFound("We couldn't find a driving route to that address.")
-        return routes[0]["distanceMeters"] / METERS_PER_MILE
-
 
 def get_maps():
     backend = settings.MAPS_BACKEND
@@ -128,19 +109,20 @@ def get_maps():
     raise ImproperlyConfigured(f"Unknown MAPS_BACKEND {backend!r}")
 
 
-def lookup(address, origin):
-    """Confirm ``address`` and measure driving miles from ``origin``.
+def lookup(address, base_lat, base_lng):
+    """Confirm ``address`` and measure straight-line miles from base.
 
     Returns (Place, miles). Cached for a day so re-submitting a form doesn't
     pay for the same lookup twice.
     """
-    raw = json.dumps([one_line(address).lower(), origin.lower(), settings.MAPS_BACKEND])
+    from .pricing import straight_line_miles
+
+    raw = json.dumps([one_line(address).lower(), str(base_lat), str(base_lng), settings.MAPS_BACKEND])
     key = "maps:" + hashlib.sha256(raw.encode()).hexdigest()
     hit = cache.get(key)
     if hit:
         return Place(**hit[0]), hit[1]
-    maps = get_maps()
-    place = maps.geocode(address)
-    miles = maps.driving_miles(origin, place)
+    place = get_maps().geocode(address, near=(base_lat, base_lng))
+    miles = straight_line_miles(base_lat, base_lng, place.lat, place.lng)
     cache.set(key, (place.__dict__, miles), 60 * 60 * 24)
     return place, miles

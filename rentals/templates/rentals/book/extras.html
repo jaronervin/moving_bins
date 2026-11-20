@@ -1,0 +1,28 @@
+{% extends "rentals/base.html" %}
+{% block title %}Extras · Sprout Tote Co.{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<div class="grid">
+  <form method="post" class="card">{% csrf_token %}
+    {{ form.non_field_errors }}
+    <h2>Anything else?</h2>
+    <p class="muted">All optional. Skip ahead if your package covers it.</p>
+    <div class="qty-row">
+      <label for="{{ form.addon_totes.id_for_label }}">Extra totes
+        <span class="muted">${{ tote.addon_price|floatformat:"-2" }} each for {{ settings.min_weeks }} weeks, then ${{ tote.addon_extra_week_price|floatformat:"-2" }}/week</span></label>
+      {{ form.addon_totes }}
+    </div>
+    {{ form.addon_totes.errors }}
+    <h3>Rent (one-time fee)</h3>
+    {% for p, field in rentals %}
+      <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span></label>{{ field }}</div>
+    {% endfor %}
+    <h3>Buy (yours to keep)</h3>
+    {% for p, field in sales %}
+      <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span></label>{{ field }}</div>
+    {% endfor %}
+    <button type="submit">Continue</button>
+  </form>
+  {% include "rentals/book/_summary.html" %}
+</div>
+{% endblock %}

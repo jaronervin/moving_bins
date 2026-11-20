@@ -9,12 +9,13 @@
 <body>
   <header><div class="wrap head">
     <a href="{% url 'home' %}" class="brand"><b>Sprout Tote Co.</b> <span class="muted">· Baltimore</span></a>
-    <nav><a href="{% url 'book_dates' %}">Book</a> <a href="{% url 'find_booking' %}">My booking</a></nav>
+    <nav><a href="{% url 'book_package' %}">Book</a> <a href="{% url 'find_booking' %}">My booking</a></nav>
   </div></header>
   <main class="wrap">
     {% if messages %}<div class="messages">{% for m in messages %}<p class="msg {{ m.tags }}">{{ m }}</p>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="wrap">Reusable moving totes, delivered and picked up. Fewer boxes in the landfill.</footer>
+  <footer class="wrap">Reusable moving totes, delivered and picked up. Fewer boxes in the landfill.
+    {% with s=site_settings %}{% if s %}<br><a href="mailto:{{ s.contact_email }}">{{ s.contact_email }}</a> · {{ s.contact_phone }}{% endif %}{% endwith %}</footer>
 </body>
 </html>

@@ -17,8 +17,10 @@ def _send(to, subject_template, body_template, context):
 
 def booking_requested(booking):
     """To the renter right after submitting, and a heads-up to the owners."""
+    s = BusinessSettings.load()
     context = {"booking": booking, "link": booking_url(booking, absolute=True),
-               "review_hours": BusinessSettings.load().review_hours}
+               "review_hours": s.review_hours, "contact_email": s.contact_email,
+               "total": sum((line.amount for line in booking.price_lines.all()), 0)}
     _send([booking.customer.email], "rentals/email/requested_subject.txt",
           "rentals/email/requested_body.txt", context)
     if settings.OWNER_EMAILS:
@@ -31,7 +33,7 @@ def booking_requested(booking):
               "rentals/email/owner_new_body.txt",
               {**context, "admin_link": admin_link, "needs": needs,
                "ops_link": f"{settings.SITE_URL}/ops/",
-               "lead_days": BusinessSettings.load().purchase_lead_days})
+               "lead_days": BusinessSettings.load().purchase_lead_business_days})
 
 
 def booking_links(email, bookings):
@@ -45,3 +47,10 @@ def booking_declined(booking):
     """To the renter when the owners decline an auto-confirmed booking."""
     _send([booking.customer.email], "rentals/email/declined_subject.txt",
           "rentals/email/declined_body.txt", {"booking": booking, "site_url": settings.SITE_URL})
+
+
+def change_requested(booking):
+    """To the renter when the owners ask for a change during the review window."""
+    _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",
+          {"booking": booking, "link": booking_url(booking, absolute=True),
+           "contact_email": BusinessSettings.load().contact_email})

@@ -1,17 +1,19 @@
 """
 Booking operations that touch several tables at once.
 
-These are the only places that should create holds or change a booking's
-status, so the rules (no overbooking, hold expiry) live in one spot.
+These are the only places that should create bookings or change their
+status, so the rules (no overbooking, review window, prices locked at
+booking) live in one spot.
 """
 
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
 
 from . import inventory, pricing
-from .models import Booking, BookingLine, BusinessSettings, Product
+from .models import Booking, BookingLine, BusinessSettings, Package, PriceLine, Product
 
 
 class NotEnoughStock(Exception):
@@ -20,38 +22,90 @@ class NotEnoughStock(Exception):
         super().__init__(f"Only {free} {product} available for those dates (asked for {wanted}).")
 
 
-def price_points(product):
-    return [(p.quantity, p.unit_rate) for p in product.price_points.all()]
+# ---------------------------------------------------------------------------
+# What's being ordered, and its price
+# ---------------------------------------------------------------------------
 
 
-def quote(items, weeks, pickup_miles=None):
-    """Price ``items`` [(product, quantity), ...] for ``weeks`` weeks.
+@dataclass
+class Order:
+    """A renter's choices: a package, how long, extra totes, extras."""
 
-    If ``pickup_miles`` is given, the pickup fee is included (and an
-    OutOfRange error is raised if it's too far).
-    """
+    package: Package
+    weeks: int
+    addon_totes: int = 0
+    extras: dict = field(default_factory=dict)  # {Product: quantity}, rental extras and sale items
+
+    def items(self):
+        """[(product, quantity)] of everything that leaves the warehouse."""
+        totals = {}
+
+        def add(product, qty):
+            if qty:
+                totals[product] = totals.get(product, 0) + qty
+
+        add(self.package.tote_product, self.package.totes + self.addon_totes)
+        for item in self.package.items.select_related("product"):
+            add(item.product, item.quantity)
+        for product, qty in self.extras.items():
+            add(product, qty)
+        return sorted(totals.items(), key=lambda pq: pq[0].pk)
+
+
+def delivery_fees(dropoff_miles, pickup_miles):
+    """[(description, amount)] for addresses in the outer zone. Raises OutOfRange."""
     s = BusinessSettings.load()
-    fee = 0
-    if pickup_miles is not None:
-        _, fee = pricing.pickup_fee(
-            pickup_miles, s.pickup_free_miles, s.pickup_max_miles, s.pickup_rate_per_mile
-        )
-    return pricing.build_quote(
-        [(p.name, price_points(p), qty) for p, qty in items], weeks, fee
+    fees = []
+    for what, miles in (("Dropoff", dropoff_miles), ("Pickup", pickup_miles)):
+        if miles is None:
+            continue
+        amount = pricing.zone_fee(miles, s.free_radius_miles, s.max_radius_miles, s.extended_zone_fee,
+                                  what=f"The {what.lower()} address")
+        if amount:
+            fees.append((f"{what} beyond {s.free_radius_miles} miles", amount))
+    return fees
+
+
+def quote(order, dropoff_miles=None, pickup_miles=None):
+    s = BusinessSettings.load()
+    pkg, tote = order.package, order.package.tote_product
+    extras = [
+        ("sale" if p.kind == Product.Kind.SALE else "rental", p.name, qty, p.price)
+        for p, qty in sorted(order.extras.items(), key=lambda pq: (pq[0].kind, pq[0].sort_order, pq[0].name))
+    ]
+    return pricing.price_order(
+        pricing.PackageTerms(pkg.name, pkg.totes, pkg.price, pkg.extra_week_price),
+        order.weeks, s.min_weeks, s.max_weeks,
+        addon_totes=order.addon_totes, addon_price=tote.addon_price,
+        addon_extra_week_price=tote.addon_extra_week_price,
+        extras=extras, delivery=delivery_fees(dropoff_miles, pickup_miles),
     )
 
 
+def free_counts(order, dropoff_date, now=None):
+    """[(product, wanted, free)] for every stock-checked item in the order."""
+    pickup = dropoff_date + timedelta(days=7 * order.weeks)
+    return [(p, qty, inventory.available(p, dropoff_date, pickup, now))
+            for p, qty in order.items() if p.track_stock]
+
+
+# ---------------------------------------------------------------------------
+# Holding stock and locking prices
+# ---------------------------------------------------------------------------
+
+
 @transaction.atomic
-def place_hold(booking, items, now=None):
-    """Submit a booking request: check stock, lock in prices, hold the bins.
+def place_hold(booking, items, now=None, quote=None):
+    """Save a booking with its items, checking stock and locking prices.
 
     ``booking`` must already have its customer, dates and dropoff address set.
-    ``items`` is [(product, quantity), ...]. Raises NotEnoughStock if any
-    product can't be covered, in which case nothing is saved.
+    ``items`` is [(product, quantity), ...]. ``quote`` (a pricing.Quote) is
+    stored as the booking's price lines. Raises NotEnoughStock if any
+    stock-checked product can't be covered, in which case nothing is saved.
 
     The product rows are locked for the length of the transaction, so two
     renters submitting at the same moment are checked one after the other
-    and can't both take the last bins.
+    and can't both take the last totes.
     """
     now = now or timezone.now()
     product_ids = sorted(p.pk for p, _ in items)
@@ -59,6 +113,8 @@ def place_hold(booking, items, now=None):
 
     booking.save()  # computes pickup_date from dropoff_date and weeks
     for product, qty in items:
+        if not product.track_stock:
+            continue
         free = inventory.available(
             product, booking.dropoff_date, booking.pickup_date, now, exclude_booking=booking
         )
@@ -67,14 +123,16 @@ def place_hold(booking, items, now=None):
 
     booking.lines.all().delete()
     for product, qty in items:
-        rate = pricing.unit_rate(price_points(product), qty)
-        BookingLine.objects.create(
-            booking=booking,
-            product=product,
-            quantity=qty,
-            locked_unit_rate=rate,
-            locked_weekly_total=pricing.to_cents(rate * qty),
-        )
+        BookingLine.objects.create(booking=booking, product=product, quantity=qty)
+
+    if quote is not None:
+        booking.price_lines.all().delete()
+        for i, line in enumerate(quote.lines):
+            PriceLine.objects.create(booking=booking, kind=line.kind, description=line.description,
+                                     quantity=line.quantity, unit_price=line.unit_price,
+                                     amount=line.amount, sort=i)
+        booking.renewal_week_price = quote.renewal_week_price
+        booking.delivery_fee = quote.delivery_total
 
     booking.status = Booking.Status.REQUESTED
     booking.hold_expires_at = now + timedelta(hours=BusinessSettings.load().hold_hours)
@@ -99,21 +157,6 @@ class WindowFull(Exception):
     pass
 
 
-def check_addresses(dropoff_miles, pickup_miles):
-    """Apply the service-area rules. Returns (dropoff_miles, pickup_miles, fee).
-
-    ``pickup_miles`` may be None (address not known yet), in which case the fee
-    is 0 for now. Raises pricing.OutOfRange.
-    """
-    s = BusinessSettings.load()
-    dropoff = pricing.check_dropoff_distance(dropoff_miles, s.dropoff_max_miles)
-    if pickup_miles is None:
-        return dropoff, None, pricing.to_cents(0)
-    pickup, fee = pricing.pickup_fee(pickup_miles, s.pickup_free_miles, s.pickup_max_miles,
-                                     s.pickup_rate_per_mile)
-    return dropoff, pickup, fee
-
-
 def _address(data):
     from .models import Address
 
@@ -124,13 +167,23 @@ def _address(data):
     )
 
 
+def order_from_draft(draft):
+    package = Package.objects.get(pk=draft["package_id"], active=True)
+    extras = {}
+    ids = [int(k) for k, v in draft.get("extras", {}).items() if int(v) > 0]
+    for p in Product.objects.filter(pk__in=ids, active=True):
+        extras[p] = int(draft["extras"][str(p.pk)])
+    return Order(package=package, weeks=int(draft["weeks"]),
+                 addon_totes=int(draft.get("addon_totes", 0)), extras=extras)
+
+
 @transaction.atomic
 def submit_booking(draft, now=None):
-    """Turn a finished booking-flow draft into a held booking.
+    """Turn a finished booking-flow draft into a booking.
 
     ``draft`` is the dict the booking flow keeps in the session (see
     rentals/booking_flow.py). Everything is re-checked here, inside one
-    transaction: distances, window space and stock. If anything fails,
+    transaction: distances, delivery-day space and stock. If anything fails,
     nothing is saved.
     """
     from datetime import date
@@ -139,26 +192,22 @@ def submit_booking(draft, now=None):
     from .models import Customer, TimeWindow, Visit
 
     now = now or timezone.now()
-    product = Product.objects.get(pk=draft["product_id"])
+    order = order_from_draft(draft)
     dropoff_date = date.fromisoformat(draft["dropoff_date"])
-    weeks = int(draft["weeks"])
-    pickup_date = dropoff_date + timedelta(days=7 * weeks)
-
+    pickup_date = dropoff_date + timedelta(days=7 * order.weeks)
     pickup = draft.get("pickup")
-    dropoff_miles, pickup_miles, fee = check_addresses(
-        draft["dropoff"]["miles"], pickup["miles"] if pickup else None
-    )
+    the_quote = quote(order, draft["dropoff"]["miles"], pickup["miles"] if pickup else None)
 
-    # Lock the two windows so two renters can't take the last stop at once.
-    window_ids = sorted({draft["dropoff_window_id"], draft["pickup_window_id"]})
-    locked = {w.pk: w for w in TimeWindow.objects.select_for_update().filter(pk__in=window_ids)}
-    dropoff_window = locked.get(draft["dropoff_window_id"])
-    pickup_window = locked.get(draft["pickup_window_id"])
-    for window, day in ((dropoff_window, dropoff_date), (pickup_window, pickup_date)):
-        if window is None or not window.is_open or window.date != day:
-            raise WindowFull("That delivery time is no longer offered. Please pick another.")
-        if windows.stops_left(window, now) < 1:
-            raise WindowFull(f"{window} just filled up. Please pick another time.")
+    # Each open date has one delivery window ("delivered by"). Lock them so two
+    # renters can't take the last stop on a day at the same moment.
+    found = {}
+    for kind, day in (("dropoff", dropoff_date), ("pickup", pickup_date)):
+        window = next(iter(windows.open_windows(day, now)), None)
+        if window is None:
+            raise WindowFull(f"We just filled up for {day:%A, %B %-d}. Please pick another date.")
+        found[kind] = TimeWindow.objects.select_for_update().get(pk=window.pk)
+        if windows.stops_left(found[kind], now) < 1:
+            raise WindowFull(f"We just filled up for {day:%A, %B %-d}. Please pick another date.")
 
     contact = draft["contact"]
     customer = Customer.objects.filter(email__iexact=contact["email"]).order_by("-id").first()
@@ -168,31 +217,34 @@ def submit_booking(draft, now=None):
     customer.phone = contact.get("phone", "")
     customer.save()
 
+    delivery = draft.get("delivery", {})
     booking = Booking(
         customer=customer,
+        package=order.package,
         dropoff_date=dropoff_date,
-        weeks=weeks,
+        weeks=order.weeks,
         dropoff_address=_address(draft["dropoff"]),
         pickup_address=_address(pickup) if pickup else None,
-        dropoff_miles=dropoff_miles,
-        pickup_miles=pickup_miles,
-        pickup_fee=fee,
+        dropoff_miles=round(draft["dropoff"]["miles"]),
+        pickup_miles=round(pickup["miles"]) if pickup else None,
+        presence=delivery.get("presence", Booking.Presence.PORCH),
+        time_request=delivery.get("time_request", ""),
         access_notes=contact.get("access_notes", ""),
     )
-    place_hold(booking, [(product, int(draft["quantity"]))], now=now)
+    place_hold(booking, order.items(), now=now, quote=the_quote)
 
-    Visit.objects.create(booking=booking, kind=Visit.Kind.DROPOFF, requested_window=dropoff_window)
-    Visit.objects.create(booking=booking, kind=Visit.Kind.PICKUP, requested_window=pickup_window)
+    Visit.objects.create(booking=booking, kind=Visit.Kind.DROPOFF, requested_window=found["dropoff"])
+    Visit.objects.create(booking=booking, kind=Visit.Kind.PICKUP, requested_window=found["pickup"])
     if BusinessSettings.load().auto_confirm:
         confirm_booking(booking, now=now)
     return booking
 
 
 def confirm_booking(booking, now=None):
-    """Confirm with the renter's chosen windows.
+    """Confirm with the delivery days the renter chose.
 
     When this happens automatically at submit, the owners can still decline
-    within ``review_hours`` (see ``decline_booking``).
+    or ask for a change within ``review_hours``.
     """
     from .models import Visit
 
@@ -208,8 +260,21 @@ def confirm_booking(booking, now=None):
     return booking
 
 
+# ---------------------------------------------------------------------------
+# Owners' review window: decline, or ask for a change
+# ---------------------------------------------------------------------------
+
+
 class CannotDecline(Exception):
     pass
+
+
+def _check_review_window(booking, now):
+    if booking.status != Booking.Status.CONFIRMED:
+        raise CannotDecline(f"{booking.reference} is {booking.get_status_display().lower()}.")
+    if booking.review_until is None or now > booking.review_until:
+        raise CannotDecline(f"The {BusinessSettings.load().review_hours}-hour review window for "
+                            f"{booking.reference} has passed. Contact the renter directly.")
 
 
 @transaction.atomic
@@ -222,11 +287,7 @@ def decline_booking(booking, reason, now=None):
     from .models import Bin, BinEvent, StockState, Visit
 
     now = now or timezone.now()
-    if booking.status != Booking.Status.CONFIRMED:
-        raise CannotDecline(f"{booking.reference} is {booking.get_status_display().lower()}.")
-    if booking.review_until is None or now > booking.review_until:
-        raise CannotDecline(f"The {BusinessSettings.load().review_hours}-hour window to decline "
-                            f"{booking.reference} has passed. Contact the renter to change or cancel it.")
+    _check_review_window(booking, now)
     for b in Bin.objects.select_for_update().filter(booking=booking, status=StockState.OUT):
         b.status, b.booking = StockState.READY, None
         b.save(update_fields=["status", "booking"])
@@ -240,17 +301,42 @@ def decline_booking(booking, reason, now=None):
     return booking
 
 
+def request_change(booking, message, now=None):
+    """Owners ask the renter to change something (e.g. a different dropoff day).
+
+    The booking stays confirmed; the renter is emailed and sees the message
+    on their booking page.
+    """
+    now = now or timezone.now()
+    _check_review_window(booking, now)
+    if not message.strip():
+        raise CannotDecline("Write what you'd like the renter to change.")
+    booking.change_request = message.strip()
+    booking.change_requested_at = now
+    booking.save(update_fields=["change_request", "change_requested_at", "updated_at"])
+    return booking
+
+
+# ---------------------------------------------------------------------------
+# Renter changes
+# ---------------------------------------------------------------------------
+
 EDITABLE_STATUSES = [Booking.Status.REQUESTED, Booking.Status.TIMES_PROPOSED, Booking.Status.CONFIRMED]
 
 
 @transaction.atomic
 def set_pickup_address(booking, address_data, miles):
-    """Add (or change) the moving-in address before dropoff."""
+    """Add (or change) the moving-in address before dropoff, updating delivery fees."""
     if booking.status not in EDITABLE_STATUSES:
         raise pricing.PricingError("This booking can't be changed online anymore.")
-    _, pickup_miles, fee = check_addresses(booking.dropoff_miles or 0, miles)
+    fees = delivery_fees(booking.dropoff_miles or 0, miles)  # raises OutOfRange if too far
     booking.pickup_address = _address(address_data)
-    booking.pickup_miles = pickup_miles
-    booking.pickup_fee = fee
+    booking.pickup_miles = round(miles)
+    booking.price_lines.filter(kind=PriceLine.Kind.DELIVERY).delete()
+    start = booking.price_lines.count()
+    for i, (description, amount) in enumerate(fees):
+        PriceLine.objects.create(booking=booking, kind=PriceLine.Kind.DELIVERY, description=description,
+                                 quantity=1, unit_price=amount, amount=amount, sort=start + i)
+    booking.delivery_fee = sum((a for _, a in fees), pricing.ZERO)
     booking.save()
     return booking

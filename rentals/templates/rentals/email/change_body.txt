@@ -1,0 +1,11 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Thanks for booking with us! We need one change to make your booking work:
+
+{{ booking.change_request }}
+
+Just reply to this email, or reach us at {{ contact_email }}. Your booking is
+still confirmed, and nothing has been charged.
+
+Your booking: {{ link }}
+Reference: {{ booking.reference }}{% endautoescape %}

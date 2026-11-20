@@ -12,40 +12,78 @@ class Form(forms.Form):
         super().__init__(*args, **kwargs)
 
 
-class QuoteForm(Form):
-    quantity = forms.IntegerField(min_value=1, initial=40, label="How many bins?")
-    dropoff_date = forms.DateField(
-        label="Dropoff date", widget=forms.DateInput(attrs={"type": "date"})
-    )
-    weeks = forms.TypedChoiceField(
-        coerce=int,
-        choices=[(n, f"{n} week{'s' if n > 1 else ''}") for n in range(1, 5)],
-        initial=1,
-        label="For how long?",
-    )
+class PackageForm(Form):
+    """Step 1: which package, for how long, starting when."""
 
-    def __init__(self, *args, minimum_quantity=20, min_notice_days=3, **kwargs):
+    package = forms.ModelChoiceField(queryset=None, widget=forms.RadioSelect, empty_label=None,
+                                     label="Choose a package")
+    weeks = forms.TypedChoiceField(coerce=int, label="For how long?")
+    dropoff_date = forms.DateField(label="Dropoff date", widget=forms.DateInput(attrs={"type": "date"}))
+
+    def __init__(self, *args, min_notice_days=3, min_weeks=2, max_weeks=4, **kwargs):
+        from .models import Package
+
         super().__init__(*args, **kwargs)
-        self.minimum_quantity = minimum_quantity
-        self.fields["quantity"].min_value = minimum_quantity
-        self.fields["quantity"].widget.attrs["min"] = minimum_quantity
+        self.fields["package"].queryset = Package.objects.filter(active=True)
+        self.fields["weeks"].choices = [(n, f"{n} weeks") for n in range(min_weeks, max_weeks + 1)]
+        self.fields["weeks"].initial = min_weeks
         self.earliest = timezone.localdate() + timedelta(days=min_notice_days)
         self.fields["dropoff_date"].widget.attrs["min"] = self.earliest.isoformat()
         self.fields["dropoff_date"].initial = self.earliest
-
-    def clean_quantity(self):
-        q = self.cleaned_data["quantity"]
-        if q < self.minimum_quantity:
-            raise forms.ValidationError(f"The minimum order is {self.minimum_quantity} bins.")
-        return q
 
     def clean_dropoff_date(self):
         d = self.cleaned_data["dropoff_date"]
         if d < self.earliest:
             raise forms.ValidationError(
-                f"We need a few days' notice. The earliest dropoff is {self.earliest:%A, %B %-d}."
+                f"We need at least 3 days' notice. The earliest dropoff is {self.earliest:%A, %B %-d}. "
+                "For something sooner, please contact us."
             )
         return d
+
+
+class ExtrasForm(Form):
+    """Step 2: extra totes, rental extras and items for sale (one field per product)."""
+
+    addon_totes = forms.IntegerField(min_value=0, max_value=200, initial=0, required=False,
+                                     label="Extra totes")
+
+    def __init__(self, *args, products=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.products = list(products)
+        for p in self.products:
+            self.fields[f"x_{p.pk}"] = forms.IntegerField(
+                min_value=0, max_value=50, initial=0, required=False, label=p.name,
+                widget=forms.NumberInput(attrs={"inputmode": "numeric", "class": "qty"}))
+
+    def extras(self):
+        """{product id (str): quantity} for everything with a quantity."""
+        return {str(p.pk): self.cleaned_data.get(f"x_{p.pk}") or 0
+                for p in self.products if self.cleaned_data.get(f"x_{p.pk}")}
+
+    def rows(self, kind):
+        return [(p, self[f"x_{p.pk}"]) for p in self.products if p.kind == kind]
+
+
+class DeliveryForm(Form):
+    """Step 4: porch or present, and an optional time request."""
+
+    presence = forms.ChoiceField(
+        widget=forms.RadioSelect, label="At dropoff and pickup",
+        choices=[("porch", "Leave the totes at my door or porch (at my own risk)"),
+                 ("present", "I'll be there: I've noted a time that works below")],
+        initial="porch",
+    )
+    time_request = forms.CharField(
+        required=False, max_length=200, label="Prefer a specific time? (optional)",
+        widget=forms.TextInput(attrs={"placeholder": "e.g. after 10 AM on dropoff day"}),
+        help_text="We'll do our best; we'll always arrive by the guaranteed time.",
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get("presence") == "present" and not data.get("time_request"):
+            self.add_error("time_request", "Let us know when you'll be there.")
+        return data
 
 
 US_STATES_NEARBY = [("MD", "Maryland"), ("PA", "Pennsylvania"), ("DE", "Delaware"),

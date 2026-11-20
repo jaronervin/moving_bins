@@ -1,0 +1,19 @@
+{% extends "rentals/base.html" %}
+{% block title %}Delivery · Sprout Tote Co.{% endblock %}
+{% block content %}
+{% include "rentals/book/_steps.html" %}
+<div class="grid">
+  <form method="post" class="card">{% csrf_token %}
+    <h2>Delivery</h2>
+    <dl class="facts">
+      <dt>Dropoff</dt>
+      <dd>{{ dropoff_date|date:"l, M j" }}{% if dropoff_window %}<br><b>Delivered by {{ dropoff_window.end|time:"g:i A" }}</b>{% endif %}</dd>
+      <dt>Pickup</dt>
+      <dd>{{ pickup_date|date:"l, M j" }}{% if pickup_window %}<br><b>Have your totes ready by {{ pickup_window.start|time:"g:i A" }}</b>; we'll collect them by {{ pickup_window.end|time:"g:i A" }}{% endif %}</dd>
+    </dl>
+    {{ form }}
+    <button type="submit">Continue</button>
+  </form>
+  {% include "rentals/book/_summary.html" %}
+</div>
+{% endblock %}

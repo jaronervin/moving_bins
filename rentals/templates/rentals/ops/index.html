@@ -3,27 +3,31 @@
 <h1>Owner tools</h1>
 {% for need in buy %}
 <section class="card attention">
-  <h2>Buy {{ need.short }} more {{ need.product }}{{ need.short|pluralize }}</h2>
+  <h2>Buy {{ need.short }} more ({{ need.product }})</h2>
   <p>Bookings need up to {{ need.owned|add:need.short }} on some days; you own {{ need.owned }}.
     First short day: <b>{{ need.first_date|date:"D M j" }}</b>.
-    {% if need.late %}<b>Order now</b>: that's inside your {{ settings.purchase_lead_days }}-day lead time.
+    {% if need.late %}<b>Order now</b>: that's inside your {{ settings.purchase_lead_business_days }}-business-day lead time.
     {% else %}Order by <b>{{ need.order_by|date:"D M j" }}</b>.{% endif %}</p>
 </section>
 {% endfor %}
 {% if reviewable %}
 <section class="card">
-  <h2>New bookings (you can still decline)</h2>
+  <h2>New bookings (you can still decline or ask for a change)</h2>
   {% for b in reviewable %}
     <details class="review">
       <summary><b>{{ b.reference }}</b> · {{ b.customer.name }} ·
-        {% for line in b.lines.all %}{{ line.quantity }} totes{% endfor %} · dropoff {{ b.dropoff_date|date:"D M j" }}
-        <span class="muted">· decline by {{ b.review_until|date:"D g:i A" }}</span></summary>
+        {{ b.package.name|default:"" }} · dropoff {{ b.dropoff_date|date:"D M j" }}
+        <span class="muted">· until {{ b.review_until|date:"D g:i A" }}</span>{% if b.change_request %} <span class="badge">change asked</span>{% endif %}</summary>
       <p class="muted">{{ b.dropoff_address }} → {% if b.pickup_address %}{{ b.pickup_address }}{% else %}moving-in address not given yet{% endif %}</p>
-      <form method="post" action="{% url 'ops_decline' b.reference %}"
-            onsubmit="return confirm('Decline {{ b.reference }} and email {{ b.customer.name|escapejs }}?')">{% csrf_token %}
-        <label for="reason-{{ b.pk }}">Reason (sent to the renter)</label>
-        <textarea id="reason-{{ b.pk }}" name="reason" rows="2" placeholder="e.g. We're fully booked for those dates."></textarea>
-        <button type="submit" class="danger">Decline booking</button>
+      {% if b.time_request %}<p class="muted">Time request: {{ b.time_request }}</p>{% endif %}
+      <form method="post" action="{% url 'ops_decline' b.reference %}">{% csrf_token %}
+        <label for="reason-{{ b.pk }}">Message to the renter</label>
+        <textarea id="reason-{{ b.pk }}" name="reason" rows="2" placeholder="e.g. Could we drop off Saturday instead of Friday?"></textarea>
+        <div class="button-row">
+          <button type="submit" name="action" value="change" class="secondary">Ask for a change</button>
+          <button type="submit" name="action" value="decline" class="danger"
+                  onclick="return confirm('Decline {{ b.reference }} and email {{ b.customer.name|escapejs }}?')">Decline booking</button>
+        </div>
       </form>
     </details>
   {% endfor %}

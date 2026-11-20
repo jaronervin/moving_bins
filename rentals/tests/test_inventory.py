@@ -138,11 +138,6 @@ class AvailabilityTests(TestCase):
         services.place_hold(b, [(self.bins, 90)], now=NOW)  # change quantity
         self.assertEqual(b.lines.get().quantity, 90)
 
-    def test_locked_rate(self):
-        b = self.hold(35, date(2027, 1, 9))
-        line = b.lines.get()
-        self.assertEqual(line.locked_weekly_total, D("162.05"))
-
     def _out_of_service(self, n):
         from rentals.models import Bin
         ids = Bin.objects.filter(status="ready").values_list("id", flat=True)[:n]
@@ -163,10 +158,8 @@ class PlannedCapacityTests(TestCase):
     """Own 60, take bookings as if 120, and get told when to buy more."""
 
     def setUp(self):
-        self.bins = bins()
+        self.bins = bins(planned_capacity=120)
         inventory.record_purchase(self.bins, 60)
-        self.bins.planned_capacity = 120
-        self.bins.save()
         self.today = date(2027, 1, 1)
 
     def hold(self, qty, dropoff):
@@ -188,7 +181,7 @@ class PlannedCapacityTests(TestCase):
         self.hold(45, date(2027, 1, 14))  # overlaps Jan 14-16: 85 out
         need = inventory.purchase_needs(self.bins, today=self.today, now=NOW)
         self.assertEqual((need["short"], need["first_date"], need["owned"]), (25, date(2027, 1, 14), 60))
-        self.assertEqual(need["order_by"], date(2027, 1, 9))  # 5-day lead time
+        self.assertEqual(need["order_by"], date(2027, 1, 11))  # 3 business days before Thu Jan 14
         self.assertFalse(need["late"])
         late = inventory.purchase_needs(self.bins, today=date(2027, 1, 12), now=NOW)
         self.assertTrue(late["late"])

@@ -210,15 +210,20 @@ def labels(request):
 @staff_required
 @require_POST
 def decline(request, reference):
-    """Decline an auto-confirmed booking within the review window."""
+    """Decline an auto-confirmed booking, or ask the renter for a change, within the review window."""
     from . import emails, services
 
     booking = _booking(reference)
-    reason = request.POST.get("reason", "").strip()
+    message = request.POST.get("reason", "").strip()
     try:
-        services.decline_booking(booking, reason)
-        emails.booking_declined(booking)
-        messages.success(request, f"{booking.reference} declined; {booking.customer.name} has been emailed.")
+        if request.POST.get("action") == "change":
+            services.request_change(booking, message)
+            emails.change_requested(booking)
+            messages.success(request, f"Asked {booking.customer.name} for a change to {booking.reference}.")
+        else:
+            services.decline_booking(booking, message)
+            emails.booking_declined(booking)
+            messages.success(request, f"{booking.reference} declined; {booking.customer.name} has been emailed.")
     except services.CannotDecline as exc:
         messages.error(request, str(exc))
     return redirect("ops_index")

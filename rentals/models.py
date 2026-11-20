@@ -2,10 +2,12 @@
 Database tables for the rental business.
 
 Reading guide:
-  * Product / PricePoint ...... what we rent and how it's priced
+  * Product .................. what we rent or sell, and its add-on/flat price
+  * Package / PackageItem ..... the tote packages renters choose from
   * StockMovement ............. inventory ledger (every change in bin counts)
   * Customer / Address ........ who rents, and where
-  * Booking / BookingLine ..... a rental order and what's in it
+  * Booking / BookingLine ..... a rental order and what's in it (quantities)
+  * PriceLine ................. the order's price breakdown, locked at booking
   * TimeWindow / WindowTemplate  delivery windows the owners publish
   * Visit ..................... one dropoff or pickup for a booking
   * Charge .................... money moving through Stripe
@@ -26,6 +28,31 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+def counted(quantity, name):
+    """ "1 dolly", "3 dollies", "45 27-gallon totes with lid", "2 packing kits (kraft…)".
+
+    Plurals the main noun: the last word before any " with " or " (" part.
+    """
+    name = name[0].lower() + name[1:] if name[:1].isupper() and not name[1:2].isupper() else name
+    if quantity == 1:
+        return f"1 {name}"
+    cut = len(name)
+    for marker in (" with ", " ("):
+        i = name.find(marker)
+        if i != -1:
+            cut = min(cut, i)
+    head, tail = name[:cut], name[cut:]
+    if head.endswith("y") and head[-2:-1] not in "aeiou":
+        head = head[:-1] + "ies"
+    elif head.endswith(("ss", "x", "ch", "sh")):
+        head += "es"
+    elif head.endswith("s"):
+        pass  # already plural, e.g. "door jamb guards"
+    else:
+        head += "s"
+    return f"{quantity} {head}{tail}"
+
+
 # ---------------------------------------------------------------------------
 # Business settings (a single row)
 # ---------------------------------------------------------------------------
@@ -42,23 +69,31 @@ class BusinessSettings(models.Model):
         default="Baltimore, MD 21214",
         help_text="Where trips start and end. Distances are measured from here.",
     )
-    base_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    base_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    base_lat = models.DecimalField(
+        max_digits=9, decimal_places=6, default=Decimal("39.352000"),
+        help_text="Center of the service area (default: approx. center of ZIP 21214).",
+    )
+    base_lng = models.DecimalField(max_digits=9, decimal_places=6, default=Decimal("-76.563000"))
 
-    dropoff_max_miles = models.PositiveIntegerField(
-        default=30, help_text="Dropoffs farther than this (driving miles) are refused."
+    free_radius_miles = models.PositiveIntegerField(
+        default=20, help_text="Dropoff and pickup are free within this radius (straight line)."
     )
-    pickup_free_miles = models.PositiveIntegerField(
-        default=30, help_text="Pickups up to this distance are free."
+    max_radius_miles = models.PositiveIntegerField(
+        default=35, help_text="Addresses farther than this are refused."
     )
-    pickup_max_miles = models.PositiveIntegerField(
-        default=60, help_text="Pickups farther than this are refused."
+    extended_zone_fee = models.DecimalField(
+        max_digits=7, decimal_places=2, default=Decimal("25.00"),
+        help_text="Charged for each address (dropoff, pickup) between the free radius and the "
+        "maximum. PLACEHOLDER: confirm the real amount before launch.",
     )
-    pickup_rate_per_mile = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
-        default=Decimal("3.00"),
-        help_text="Charged per mile beyond the free distance.",
+
+    min_weeks = models.PositiveIntegerField(default=2, help_text="Shortest rental offered online.")
+    max_weeks = models.PositiveIntegerField(default=4, help_text="Longest rental offered online.")
+
+    contact_email = models.EmailField(default="hello@sprouttoteco.com")
+    contact_phone = models.CharField(
+        max_length=30, default="703-703-2511",
+        help_text="Shown on the site. PLACEHOLDER: replace with the real number before launch.",
     )
 
     min_notice_days = models.PositiveIntegerField(
@@ -70,13 +105,14 @@ class BusinessSettings(models.Model):
         "Untick to approve each request by hand.",
     )
     review_hours = models.PositiveIntegerField(
-        default=24, help_text="With auto-confirm: how long after booking you can still decline it."
+        default=48,
+        help_text="With auto-confirm: how long after booking you can still decline it or ask for a change.",
     )
     hold_hours = models.PositiveIntegerField(
         default=48, help_text="How long a request holds bins while awaiting a response."
     )
     cancel_cutoff_hours = models.PositiveIntegerField(
-        default=48, help_text="Cancelling closer than this to dropoff costs the late fee."
+        default=72, help_text="Cancelling or changing closer than this to dropoff: late fee / not online."
     )
     late_cancel_charge_percent = models.PositiveIntegerField(
         default=50, help_text="Percent of the rental charged for a late cancellation."
@@ -91,10 +127,9 @@ class BusinessSettings(models.Model):
     contents_retention_days = models.PositiveIntegerField(
         default=30, help_text="Renters' tote contents notes are deleted this long after pickup."
     )
-    purchase_lead_days = models.PositiveIntegerField(
-        default=5,
-        help_text="Days from ordering more totes to having them labelled and ready "
-        "(supplier delivery plus time to sticker them).",
+    purchase_lead_business_days = models.PositiveIntegerField(
+        default=3,
+        help_text="Business days from ordering more totes to having them ready.",
     )
     vehicle_capacity = models.PositiveIntegerField(
         default=100, help_text="Bin sets that fit in one trip."
@@ -129,14 +164,26 @@ class BusinessSettings(models.Model):
 
 
 class Product(models.Model):
-    """Something we keep in inventory. Bins are the first; dollies etc. later.
+    """Something we rent, sell, or just keep track of.
 
-    ``is_rentable`` is False for things we only track, like spare lids.
+    * totes: rented in packages, or as add-ons at ``addon_price`` for the
+      first rental period plus ``addon_extra_week_price`` per extra week;
+    * rental extras (dollies, blankets…): a one-time ``price`` per rental;
+    * sale items (mattress bags, packing kits…): ``price`` each, not returned;
+    * parts (spare lids): tracked only, never offered.
     """
+
+    class Kind(models.TextChoices):
+        TOTE = "tote", "Tote (packages and add-ons)"
+        RENTAL = "rental", "Rental extra (one-time fee, returned)"
+        SALE = "sale", "For sale (not returned)"
+        PART = "part", "Part (tracked only)"
+
 
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.RENTAL)
     is_rentable = models.BooleanField(default=True)
     is_serialized = models.BooleanField(
         default=False,
@@ -145,6 +192,23 @@ class Product(models.Model):
     )
     active = models.BooleanField(default=True, help_text="Shown to renters.")
     minimum_quantity = models.PositiveIntegerField(default=1)
+    price = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0"),
+        help_text="Rental extras: one-time fee per rental. Sale items: price each.",
+    )
+    addon_price = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0"),
+        help_text="Totes: price per extra tote for the minimum rental length.",
+    )
+    addon_extra_week_price = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0"),
+        help_text="Totes: price per extra tote for each week beyond the minimum.",
+    )
+    track_stock = models.BooleanField(
+        default=True,
+        help_text="Check stock before booking. Untick for items you haven't counted yet "
+        "(they're then never refused).",
+    )
     replacement_price = models.DecimalField(
         max_digits=8,
         decimal_places=2,
@@ -182,28 +246,40 @@ class Product(models.Model):
         return self.name
 
 
-class PricePoint(models.Model):
-    """One point on a product's volume-pricing line.
+class Package(models.Model):
+    """A tote package, e.g. "2BR: 40 totes, 2 dollies, $169 for two weeks"."""
 
-    The per-unit rate for an order is interpolated in a straight line between
-    points and held flat past the last point. See ``rentals.pricing``.
-    Bins: (20, $5.00) and (100, $3.00).
-    """
-
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_points")
-    quantity = models.PositiveIntegerField()
-    unit_rate = models.DecimalField(
-        max_digits=8, decimal_places=4, help_text="Per unit, per week."
-    )
+    name = models.CharField(max_length=60)
+    slug = models.SlugField(unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    tote_product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="+")
+    totes = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=8, decimal_places=2, help_text="For the minimum rental length.")
+    extra_week_price = models.DecimalField(max_digits=8, decimal_places=2)
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["product", "quantity"]
-        constraints = [
-            models.UniqueConstraint(fields=["product", "quantity"], name="unique_price_point")
-        ]
+        ordering = ["sort_order", "totes"]
 
     def __str__(self):
-        return f"{self.product}: {self.quantity} @ ${self.unit_rate}"
+        return self.name
+
+
+class PackageItem(models.Model):
+    """Something included in a package at no extra cost, e.g. 2 dollies."""
+
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.quantity} × {self.product}"
+
+    @property
+    def label(self):
+        """e.g. "1 dolly", "3 dollies", "1 hand truck"."""
+        return counted(self.quantity, self.product.name)
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +311,7 @@ class StockMovement(models.Model):
 
     class Reason(models.TextChoices):
         PURCHASE = "purchase", "Purchased"
+        SOLD = "sold", "Sold to a renter"
         DROPOFF = "dropoff", "Dropped off to renter"
         PICKUP = "pickup", "Picked up from renter"
         CHECK_IN_GOOD = "check_in_good", "Checked in: good"
@@ -431,8 +508,27 @@ class Booking(models.Model):
     )
     dropoff_miles = models.PositiveIntegerField(null=True, blank=True)
     pickup_miles = models.PositiveIntegerField(null=True, blank=True)
-    pickup_fee = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("0"))
+    delivery_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0"),
+        help_text="Extended-zone fees for the dropoff and/or pickup address.",
+    )
     access_notes = models.TextField(blank=True, help_text="Porch, gate codes, etc.")
+
+    class Presence(models.TextChoices):
+        PORCH = "porch", "Leave at the door/porch (renter's risk)"
+        PRESENT = "present", "Renter will be there"
+
+    presence = models.CharField(max_length=10, choices=Presence.choices, default=Presence.PORCH)
+    time_request = models.CharField(
+        max_length=200, blank=True, help_text="Renter's note asking for a more specific time."
+    )
+    package = models.ForeignKey("Package", on_delete=models.PROTECT, null=True, blank=True)
+    renewal_week_price = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0"),
+        help_text="Charged per extra week if bins aren't ready at pickup (locked at booking).",
+    )
+    change_request = models.TextField(blank=True, help_text="What the owners asked the renter to change.")
+    change_requested_at = models.DateTimeField(null=True, blank=True)
 
     hold_expires_at = models.DateTimeField(null=True, blank=True)
     review_until = models.DateTimeField(
@@ -471,13 +567,11 @@ class Booking(models.Model):
 
 
 class BookingLine(models.Model):
-    """One product in a booking. The weekly rate is locked when booked."""
+    """How many of one product a booking takes (package totes + add-ons together)."""
 
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="lines")
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
-    locked_unit_rate = models.DecimalField(max_digits=8, decimal_places=4)
-    locked_weekly_total = models.DecimalField(max_digits=10, decimal_places=2)
 
     class Meta:
         constraints = [
@@ -486,6 +580,31 @@ class BookingLine(models.Model):
 
     def __str__(self):
         return f"{self.quantity} × {self.product}"
+
+
+class PriceLine(models.Model):
+    """One line of a booking's price, locked when booked (e.g. "2BR package, 3 weeks")."""
+
+    class Kind(models.TextChoices):
+        PACKAGE = "package", "Package"
+        ADDON = "addon", "Extra totes"
+        RENTAL = "rental", "Rental extra"
+        SALE = "sale", "Sale item"
+        DELIVERY = "delivery", "Delivery"
+
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="price_lines")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    description = models.CharField(max_length=200)
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=8, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    sort = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["booking", "sort", "id"]
+
+    def __str__(self):
+        return f"{self.description}: ${self.amount}"
 
 
 class Visit(models.Model):

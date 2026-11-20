@@ -20,9 +20,7 @@ NOW = timezone.make_aware(datetime(2027, 1, 1, 12, 0))
 
 def rental(qty=3, with_pickup_address=True):
     """A confirmed booking for ``qty`` bins, with dropoff/pickup visits."""
-    from rentals.models import Address, PricePoint
-    # Small test rentals: allow orders below the real 20-bin minimum.
-    PricePoint.objects.get_or_create(product=bin_product(), quantity=1, defaults={"unit_rate": D("5")})
+    from rentals.models import Address
     b = services.place_hold(make_booking(dropoff=date(2027, 1, 9)), [(bin_product(), qty)], now=NOW)
     if with_pickup_address:
         b.pickup_address = Address.objects.create(line1="2 New St", city="Baltimore", zip_code="21218")

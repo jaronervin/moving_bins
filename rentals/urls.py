@@ -4,9 +4,10 @@ from . import booking_flow, ops, totes, views
 
 urlpatterns = [
     path("", views.home, name="home"),
-    path("book/", booking_flow.dates, name="book_dates"),
+    path("book/", booking_flow.package, name="book_package"),
+    path("book/extras/", booking_flow.extras, name="book_extras"),
     path("book/addresses/", booking_flow.addresses, name="book_addresses"),
-    path("book/times/", booking_flow.times, name="book_times"),
+    path("book/delivery/", booking_flow.delivery, name="book_delivery"),
     path("book/contact/", booking_flow.contact, name="book_contact"),
     path("book/review/", booking_flow.review, name="book_review"),
     path("book/start-over/", booking_flow.start_over, name="book_start_over"),

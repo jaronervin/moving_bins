@@ -1,14 +1,15 @@
 """
 The renter's booking flow, one step per page:
 
-    1. dates     how many bins, dropoff date, how many weeks
-    2. addresses moving out of (dropoff) and moving into (pickup)
-    3. times     dropoff and pickup windows
-    4. contact   name, email, phone, notes
-    5. review    check everything and submit → bins are held
+    1. package    which package, how many weeks, dropoff date
+    2. extras     extra totes, rental extras (dollies, blankets…), items for sale
+    3. addresses  moving out of (dropoff) and moving into (pickup)
+    4. delivery   delivery-by times, porch or present, optional time request
+    5. contact    name, email, phone, notes
+    6. review     check everything and book
 
 Card details (milestone 4) and the agreement (milestone 5) will slot in
-between contact and submit.
+before booking.
 
 Answers are kept in the visitor's session (stored server-side, so they can't
 be tampered with) under the key "draft" until the booking is submitted.
@@ -17,28 +18,20 @@ be tampered with) under the key "draft" until the booking is submitted.
 from datetime import date, timedelta
 
 from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from . import emails, inventory, maps, pricing, services, windows
-from .forms import AddressForm, ContactForm, PickupAddressForm, QuoteForm, TimesForm
+from . import emails, maps, pricing, services, windows
+from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm
 from .links import booking_url
-from .models import BusinessSettings, Product, TimeWindow
+from .models import BusinessSettings, Package, Product
 
 SESSION_KEY = "draft"
-STEPS = [("dates", "Dates"), ("addresses", "Addresses"), ("times", "Times"),
-         ("contact", "Contact"), ("review", "Review")]
-# What each step needs from the steps before it.
-REQUIRES = {
-    "addresses": ["quantity"],
-    "times": ["quantity", "dropoff"],
-    "contact": ["quantity", "dropoff", "dropoff_window_id"],
-    "review": ["quantity", "dropoff", "dropoff_window_id", "contact"],
-}
-
-
-def _product():
-    return get_object_or_404(Product, slug="bin-27gal", active=True)
+STEPS = [("package", "Package"), ("extras", "Extras"), ("addresses", "Addresses"),
+         ("delivery", "Delivery"), ("contact", "Contact"), ("review", "Review")]
+# The draft key each step fills in.
+KEY_SET_BY = {"package": "package_id", "extras": "extras", "addresses": "dropoff",
+              "delivery": "delivery", "contact": "contact", "review": "_never"}
 
 
 def _draft(request):
@@ -56,69 +49,99 @@ def _dates(draft):
     return dropoff, dropoff + timedelta(days=7 * int(draft["weeks"]))
 
 
-def _render(request, step, template, context):
-    draft = _draft(request)
-    done = {name for name, key in _KEY_SET_BY.items() if key in draft}
-    context.update({"steps": STEPS, "step": step, "done": done, "draft": draft,
-                    "auto_confirm": BusinessSettings.load().auto_confirm})
-    return render(request, template, context)
-
-
-# The draft key each step fills in, used to show finished steps as links.
-_KEY_SET_BY = {"dates": "quantity", "addresses": "dropoff", "times": "dropoff_window_id",
-               "contact": "contact", "review": "_never"}
-
-
 def _guard(request, step):
     """Send the renter back to the first step they haven't finished."""
     draft = _draft(request)
-    for needed in REQUIRES.get(step, []):
-        if needed not in draft:
-            first_missing = next(name for name, key in _KEY_SET_BY.items() if key == needed)
-            return redirect(f"book_{first_missing}")
+    for name, _ in STEPS:
+        if name == step:
+            return None
+        if KEY_SET_BY[name] not in draft:
+            return redirect(f"book_{name}")
     return None
+
+
+def _order(draft):
+    return services.order_from_draft({"extras": {}, "addon_totes": 0, **draft})
+
+
+def _render(request, step, template, context):
+    draft = _draft(request)
+    quote = None
+    if "package_id" in draft:
+        try:
+            pickup = draft.get("pickup")
+            quote = services.quote(_order(draft), draft.get("dropoff", {}).get("miles"),
+                                   pickup["miles"] if pickup else None)
+        except (pricing.PricingError, Package.DoesNotExist):
+            quote = None
+    context.update({
+        "steps": STEPS, "step": step, "draft": draft, "quote": quote,
+        "done": {name for name, key in KEY_SET_BY.items() if key in draft},
+        "settings": BusinessSettings.load(),
+    })
+    return render(request, template, context)
 
 
 # ---------------------------------------------------------------------------
 
 
-def dates(request):
-    product = _product()
+def package(request):
+    s = BusinessSettings.load()
     draft = _draft(request)
     data = request.POST or request.GET or None
-    if not data and "quantity" in draft:
-        data = {k: draft[k] for k in ("quantity", "dropoff_date", "weeks")}
-    form = QuoteForm(data, minimum_quantity=product.minimum_quantity,
-                     min_notice_days=BusinessSettings.load().min_notice_days)
+    if not data and "package_id" in draft:
+        data = {"package": draft["package_id"], "weeks": draft["weeks"], "dropoff_date": draft["dropoff_date"]}
+    form = PackageForm(data, min_notice_days=s.min_notice_days, min_weeks=s.min_weeks, max_weeks=s.max_weeks)
+    if request.method == "GET" and request.GET.get("package") and not request.GET.get("dropoff_date"):
+        form = PackageForm(initial={"package": request.GET["package"]}, min_notice_days=s.min_notice_days,
+                           min_weeks=s.min_weeks, max_weeks=s.max_weeks)
     suggestions = []
 
-    if data and form.is_valid():
-        qty, dropoff, weeks = (form.cleaned_data[k] for k in ("quantity", "dropoff_date", "weeks"))
+    if request.method == "POST" and form.is_valid():
+        pkg, weeks, dropoff = (form.cleaned_data[k] for k in ("package", "weeks", "dropoff_date"))
         pickup = dropoff + timedelta(days=7 * weeks)
-        free = inventory.available(product, dropoff, pickup)
-        if qty > free:
-            form.add_error("quantity", f"Only {free} bins are free for those dates.")
+        for product, wanted, free in services.free_counts(services.Order(pkg, weeks), dropoff):
+            if wanted > free:
+                form.add_error("package", f"We only have {free} {product.name.lower()}s free for those "
+                                          f"dates. Try other dates or a smaller package.")
         if not windows.open_windows(dropoff):
-            form.add_error("dropoff_date", "We have no dropoff times left that day.")
+            form.add_error("dropoff_date", "We're not delivering that day, or it's full.")
             suggestions = windows.next_open_dates(form.earliest)
         elif not windows.open_windows(pickup):
-            form.add_error("weeks", f"We have no pickup times left on {pickup:%a %b %-d}. "
+            form.add_error("weeks", f"We can't pick up on {pickup:%A, %B %-d} (the end of that rental). "
                                     "Try another length or start date.")
-        if form.is_valid() and request.method == "POST":
-            changed = (draft.get("dropoff_date"), draft.get("weeks")) != (dropoff.isoformat(), weeks)
-            _save(request, product_id=product.pk, quantity=qty,
-                  dropoff_date=dropoff.isoformat(), weeks=weeks)
-            if changed:  # new dates: earlier window choices no longer apply
-                for key in ("dropoff_window_id", "pickup_window_id"):
-                    request.session[SESSION_KEY].pop(key, None)
-                request.session.modified = True
-            return redirect("book_addresses")
+        if form.is_valid():
+            _save(request, package_id=pkg.pk, weeks=weeks, dropoff_date=dropoff.isoformat())
+            return redirect("book_extras")
 
-    quote = None
-    if form.is_bound and form.is_valid():
-        quote = services.quote([(product, form.cleaned_data["quantity"])], form.cleaned_data["weeks"])
-    return _render(request, "dates", "rentals/book/dates.html", {
-        "form": form, "quote": quote, "suggestions": suggestions,
+    return _render(request, "package", "rentals/book/package.html", {
+        "form": form, "packages": Package.objects.filter(active=True).prefetch_related("items__product"),
+        "suggestions": suggestions,
+    })
+
+
+def extras(request):
+    if (r := _guard(request, "extras")):
+        return r
+    draft = _draft(request)
+    products = Product.objects.filter(active=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
+    initial = {"addon_totes": draft.get("addon_totes", 0),
+               **{f"x_{k}": v for k, v in draft.get("extras", {}).items()}}
+    form = ExtrasForm(request.POST or None, initial=initial, products=products)
+    if request.method == "POST" and form.is_valid():
+        addon = form.cleaned_data.get("addon_totes") or 0
+        order = services.order_from_draft({**draft, "addon_totes": addon, "extras": form.extras()})
+        dropoff, _ = _dates(draft)
+        for product, wanted, free in services.free_counts(order, dropoff):
+            if wanted > free:
+                form.add_error(None, f"We only have {free} {product.name.lower()}s free for those dates.")
+        if form.is_valid():
+            _save(request, addon_totes=addon, extras=form.extras())
+            return redirect("book_addresses")
+    tote = Package.objects.get(pk=draft["package_id"]).tote_product
+    return _render(request, "extras", "rentals/book/extras.html", {
+        "form": form, "tote": tote,
+        "rentals": form.rows(Product.Kind.RENTAL), "sales": form.rows(Product.Kind.SALE),
     })
 
 
@@ -126,7 +149,7 @@ def _lookup_into(form, settings):
     """Look up a valid address form; returns the dict to store, or None with errors added."""
     address = {k: form.cleaned_data.get(k, "") for k in ("line1", "line2", "city", "state", "zip_code")}
     try:
-        place, miles = maps.lookup(address, settings.base_address)
+        place, miles = maps.lookup(address, settings.base_lat, settings.base_lng)
     except maps.AddressNotFound as exc:
         form.add_error(None, str(exc))
         return None
@@ -149,19 +172,15 @@ def addresses(request):
                 pickup = None
                 if not pickup_form.cleaned_data["unknown"]:
                     pickup = _lookup_into(pickup_form, settings)
-                if dropoff:
-                    try:
-                        services.check_addresses(dropoff["miles"], None)
-                    except pricing.OutOfRange as exc:
-                        dropoff_form.add_error(None, str(exc))
-                if pickup:
-                    try:
-                        services.check_addresses(0, pickup["miles"])
-                    except pricing.OutOfRange as exc:
-                        pickup_form.add_error(None, str(exc))
+                for form, place in ((dropoff_form, dropoff), (pickup_form, pickup)):
+                    if place:
+                        try:
+                            services.delivery_fees(place["miles"], None)
+                        except pricing.OutOfRange as exc:
+                            form.add_error(None, str(exc))
                 if not dropoff_form.errors and not pickup_form.errors:
                     _save(request, dropoff=dropoff, pickup=pickup)
-                    return redirect("book_times")
+                    return redirect("book_delivery")
             except maps.MapsUnavailable as exc:
                 messages.error(request, str(exc))
     else:
@@ -170,32 +189,29 @@ def addresses(request):
         pickup_form = PickupAddressForm(prefix="pickup", initial=pickup_initial)
 
     return _render(request, "addresses", "rentals/book/addresses.html", {
-        "dropoff_form": dropoff_form, "pickup_form": pickup_form, "settings": settings,
+        "dropoff_form": dropoff_form, "pickup_form": pickup_form,
     })
 
 
-def times(request):
-    if (r := _guard(request, "times")):
+def _delivery_windows(draft):
+    dropoff_date, pickup_date = _dates(draft)
+    return (dropoff_date, next(iter(windows.open_windows(dropoff_date)), None),
+            pickup_date, next(iter(windows.open_windows(pickup_date)), None))
+
+
+def delivery(request):
+    if (r := _guard(request, "delivery")):
         return r
     draft = _draft(request)
-    dropoff_date, pickup_date = _dates(draft)
-    dropoff_windows = windows.open_windows(dropoff_date)
-    pickup_windows = windows.open_windows(pickup_date)
-    kwargs = {"dropoff_windows": dropoff_windows, "pickup_windows": pickup_windows}
-
-    if request.method == "POST":
-        form = TimesForm(request.POST, **kwargs)
-        if form.is_valid():
-            _save(request, dropoff_window_id=form.cleaned_data["dropoff_window"],
-                  pickup_window_id=form.cleaned_data["pickup_window"])
-            return redirect("book_contact")
-    else:
-        form = TimesForm(initial={"dropoff_window": draft.get("dropoff_window_id"),
-                                  "pickup_window": draft.get("pickup_window_id")}, **kwargs)
-
-    return _render(request, "times", "rentals/book/times.html", {
-        "form": form, "dropoff_date": dropoff_date, "pickup_date": pickup_date,
-        "no_times": not dropoff_windows or not pickup_windows,
+    form = DeliveryForm(request.POST or None, initial=draft.get("delivery"))
+    if request.method == "POST" and form.is_valid():
+        _save(request, delivery={"presence": form.cleaned_data["presence"],
+                                 "time_request": form.cleaned_data["time_request"]})
+        return redirect("book_contact")
+    dropoff_date, dropoff_window, pickup_date, pickup_window = _delivery_windows(draft)
+    return _render(request, "delivery", "rentals/book/delivery.html", {
+        "form": form, "dropoff_date": dropoff_date, "dropoff_window": dropoff_window,
+        "pickup_date": pickup_date, "pickup_window": pickup_window,
     })
 
 
@@ -216,19 +232,16 @@ def review(request):
     if (r := _guard(request, "review")):
         return r
     draft = _draft(request)
-    product = Product.objects.get(pk=draft["product_id"])
-    dropoff_date, pickup_date = _dates(draft)
-    pickup = draft.get("pickup")
 
     if request.method == "POST":
         try:
             booking = services.submit_booking(draft)
         except services.NotEnoughStock as exc:
-            messages.error(request, f"{exc} Please change the number of bins or the dates.")
-            return redirect("book_dates")
+            messages.error(request, f"{exc} Please change your package or dates.")
+            return redirect("book_package")
         except services.WindowFull as exc:
             messages.error(request, str(exc))
-            return redirect("book_times")
+            return redirect("book_package")
         except pricing.OutOfRange as exc:
             messages.error(request, str(exc))
             return redirect("book_addresses")
@@ -240,17 +253,15 @@ def review(request):
             messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
         return redirect(booking_url(booking))
 
-    quote = services.quote([(product, draft["quantity"])], draft["weeks"],
-                           pickup_miles=pickup["miles"] if pickup else None)
-    windows_by_id = TimeWindow.objects.in_bulk([draft["dropoff_window_id"], draft["pickup_window_id"]])
+    dropoff_date, dropoff_window, pickup_date, pickup_window = _delivery_windows(draft)
+    order = _order(draft)
     return _render(request, "review", "rentals/book/review.html", {
-        "product": product, "quote": quote, "dropoff_date": dropoff_date, "pickup_date": pickup_date,
-        "dropoff_window": windows_by_id.get(draft["dropoff_window_id"]),
-        "pickup_window": windows_by_id.get(draft["pickup_window_id"]),
-        "settings": BusinessSettings.load(),
+        "order": order, "items": order.items(),
+        "dropoff_date": dropoff_date, "dropoff_window": dropoff_window,
+        "pickup_date": pickup_date, "pickup_window": pickup_window,
     })
 
 
 def start_over(request):
     request.session.pop(SESSION_KEY, None)
-    return redirect(reverse("book_dates"))
+    return redirect(reverse("book_package"))

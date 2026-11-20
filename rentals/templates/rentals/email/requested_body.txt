@@ -1,19 +1,26 @@
-{% autoescape off %}Hi {{ booking.customer.name }},
+{% load rentals_extras %}{% autoescape off %}Hi {{ booking.customer.name }},
 
-Thanks for choosing reusable bins for your move! Here's what you asked for:
+Thanks for moving with reusable totes! Here's your booking:
 
-  {% for line in booking.lines.all %}{{ line.quantity }} × {{ line.product.name }}
-  {% endfor %}Dropoff: {{ booking.dropoff_date|date:"l, F j" }}, {{ booking.dropoff_address }}
-  Pickup:  {{ booking.pickup_date|date:"l, F j" }}, {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}address still needed{% endif %}
+  {{ booking.package.name }} package, {{ booking.weeks }} weeks
+  {% for line in booking.lines.all %}{{ line.quantity|counted:line.product.name }}
+  {% endfor %}
+  Dropoff: {{ booking.dropoff_date|date:"l, F j" }}{% with v=booking.visits.all.0 %}{% if v.window %}, delivered by {{ v.window.end|time:"g:i A" }}{% endif %}{% endwith %}
+           {{ booking.dropoff_address }}
+  Pickup:  {{ booking.pickup_date|date:"l, F j" }}
+           {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}address still needed{% endif %}
 
-{% if booking.status == "confirmed" %}Your booking is confirmed for the times you chose. In the rare case we can't
-make it work (for example, an address we can't reach), we'll let you know
-within {{ review_hours }} hours, and you won't owe anything.{% else %}We're holding your bins and will confirm your delivery times within 48 hours.{% endif %}
-Nothing is charged until your bins are dropped off.
+  {% for line in booking.price_lines.all %}{{ line.description }}{% if line.quantity > 1 %} ({{ line.quantity }}){% endif %}: ${{ line.amount }}
+  {% endfor %}Total before tax: ${{ total }}
+
+{% if booking.status == "confirmed" %}You're booked! In the rare case we need to change something (for example,
+an address outside our area), we'll let you know within {{ review_hours }} hours.{% else %}We're holding your totes and will confirm within 48 hours.{% endif %}
+Nothing is charged until your totes are dropped off.
 {% if not booking.pickup_address %}
 Please add the address you're moving into before dropoff day. We can't drop
 off without it. You can add it here:
 {% endif %}
 View or change your booking: {{ link }}
 
+Questions? {{ contact_email }}
 Reference: {{ booking.reference }}{% endautoescape %}

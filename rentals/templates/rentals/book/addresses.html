@@ -2,17 +2,18 @@
 {% block title %}Addresses · Sprout Tote Co.{% endblock %}
 {% block content %}
 {% include "rentals/book/_steps.html" %}
+<p class="muted">Dropoff and pickup are free within {{ settings.free_radius_miles }} miles of us (Northeast Baltimore).
+  {{ settings.free_radius_miles }}–{{ settings.max_radius_miles }} miles adds ${{ settings.extended_zone_fee|floatformat:0 }} per address.</p>
 <form method="post">{% csrf_token %}
 <div class="grid">
   <section class="card">
     <h2>Moving out of</h2>
-    <p class="muted">We drop the bins off here. Must be within {{ settings.dropoff_max_miles }} driving miles of us.</p>
+    <p class="muted">We drop the totes off here.</p>
     {{ dropoff_form }}
   </section>
   <section class="card">
     <h2>Moving into</h2>
-    <p class="muted">We pick the bins up here. Free within {{ settings.pickup_free_miles }} miles,
-      then ${{ settings.pickup_rate_per_mile }} per mile up to {{ settings.pickup_max_miles }} miles.</p>
+    <p class="muted">We pick the totes up here.</p>
     {{ pickup_form }}
   </section>
 </div>
