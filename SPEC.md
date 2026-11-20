@@ -56,6 +56,15 @@ The premium tier is waiting on the full list of what's included.
 - **Rental extras**, one-time fee per rental (priced near cost, so two uses
   pay for them): dolly $10, hand truck $15, appliance dolly $25, moving
   blanket $5, wardrobe box $15, dish/glass divider $25, floor runner & door jamb guards $25.
+- **Extras stock: buy as needed.** None are owned yet; they're bought (same
+  day) with rental revenue once a booking needs them. Bookings are taken
+  against rough planning counts: dollies 10 (packages' dollies count too),
+  hand trucks 5, appliance dollies 5, moving blankets 20, floor runner & door
+  jamb guard sets 5. Wardrobe boxes and dish dividers have no limit. Past a
+  count, renters see **"Contact us for availability"** rather than "out of
+  stock", and the owners decide whether to buy more in time. Each new booking's
+  owner email says what to buy and by when ("same day is fine"). Counts and
+  lead time (per product) are editable in admin.
 - **For sale:** mattress bag Queen/King $10, Twin/Full $8, packing kit
   (kraft paper, honeycomb wrap, paper tape) $35, foam pouch $1.
 - All prices, packages and contents are editable in admin. Prices are
@@ -482,8 +491,8 @@ availability and fees.
 - [ ] Exact base address (replaces ZIP 21214 center)
 - [ ] Liability insurance / business entity (worth asking about)
 
-**Placeholders to replace before launch:** stock counts for extras. (The
-20–35 mile fee of $25 stands until further notice.) (Phone 703-703-2511 is a real number and stays for now.)
+No placeholders left in the catalog: the 20–35 mile fee of $25 stands until
+further notice, and phone 703-703-2511 is a real number.
 
 ---
 
@@ -492,5 +501,4 @@ availability and fees.
 1. Premium package above Whole Home: what's included (moving blankets,
    door jamb protectors, …) and its price.
 2. Fee for the 20–35 mile zone ($25 for now).
-3. How many of each rental extra you own (to turn on stock checks).
-4. City list for the service area: replace or supplement the radius?
+3. City list for the service area: replace or supplement the radius?

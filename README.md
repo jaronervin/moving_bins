@@ -119,7 +119,8 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Premium package** above Whole Home (Katie's $449 tier: adds moving blankets, door jamb
       protectors, etc.); waiting on the details.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
-- [ ] **Extras stock:** turn on "track stock" for each extra once counted.
+- [ ] **Extras stock:** planning counts are rough (none owned yet; see SPEC §2.2). Adjust "Planned capacity"
+      in admin as you buy.
 - [ ] **Stripe live mode:** activate the account, then set live `STRIPE_SECRET_KEY` (restricted key),
       `STRIPE_PUBLISHABLE_KEY` and `STRIPE_WEBHOOK_SECRET` in the host's secrets settings.
 - [ ] **When the LLC is formed:** update Stripe's business details (legal name, business type, EIN),

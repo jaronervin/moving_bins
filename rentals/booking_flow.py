@@ -19,7 +19,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from . import emails, maps, payments, pricing, services, signing, windows
+from . import emails, inventory, maps, payments, pricing, services, signing, windows
 from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm, SignForm
 from .links import booking_url, make_token
 from .models import BusinessSettings, Package, Product
@@ -100,8 +100,7 @@ def package(request):
         pickup = dropoff + timedelta(days=7 * weeks)
         for product, wanted, free in services.free_counts(services.Order(pkg, weeks), dropoff):
             if wanted > free:
-                form.add_error("package", f"We only have {free} {product.name.lower()}s free for those "
-                                          f"dates. Try other dates or a smaller package.")
+                form.add_error("package", services.availability_message(product, wanted))
         if not windows.open_windows(dropoff):
             form.add_error("dropoff_date", "We're not delivering that day, or it's full.")
             suggestions = windows.next_open_dates(form.earliest)
@@ -132,10 +131,16 @@ def extras(request):
         dropoff, _ = _dates(draft)
         for product, wanted, free in services.free_counts(order, dropoff):
             if wanted > free:
-                form.add_error(None, f"We only have {free} {product.name.lower()}s free for those dates.")
+                form.add_error(None, services.availability_message(product, wanted))
         if form.is_valid():
             _save(request, addon_totes=addon, extras=form.extras())
             return redirect("book_addresses")
+    # Items with none left for these dates say "contact us" (we may be able to buy more in time).
+    dropoff, pickup = _dates(draft)
+    package_qty = dict(services.order_from_draft({"extras": {}, "addon_totes": 0, **draft}).items())
+    for p in form.products:
+        p.contact_for_availability = (
+            p.track_stock and inventory.available(p, dropoff, pickup) <= package_qty.get(p, 0))
     tote = Package.objects.get(pk=draft["package_id"]).tote_product
     return _render(request, "extras", "rentals/book/extras.html", {
         "form": form, "tote": tote,
@@ -256,7 +261,7 @@ def _submit(request, draft, version, sign_form):
     try:
         booking = services.submit_booking(draft, signature=signature)
     except services.NotEnoughStock as exc:
-        messages.error(request, f"{exc} Please change your package or dates.")
+        messages.error(request, services.availability_message(exc.product, exc.wanted))
         return redirect("book_package")
     except services.WindowFull as exc:
         messages.error(request, str(exc))

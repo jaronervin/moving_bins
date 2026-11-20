@@ -15,7 +15,8 @@
     {{ form.addon_totes.errors }}
     <h3>Rent (one-time fee)</h3>
     {% for p, field in rentals %}
-      <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span></label>{{ field }}</div>
+      <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span>
+        {% if p.contact_for_availability %}<span class="muted small"><a href="mailto:{{ settings.contact_email }}">Contact us</a> for availability</span>{% endif %}</label>{{ field }}</div>
     {% endfor %}
     <h3>Buy (yours to keep)</h3>
     {% for p, field in sales %}

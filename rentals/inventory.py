@@ -126,7 +126,10 @@ def purchase_needs(product, today=None, horizon_days=120, now=None):
     if not short_days:
         return None
     first = min(short_days)
-    order_by = pricing.business_days_before(first, BusinessSettings.load().purchase_lead_business_days)
+    lead_days = product.lead_business_days
+    if lead_days is None:
+        lead_days = BusinessSettings.load().purchase_lead_business_days
+    order_by = pricing.business_days_before(first, lead_days) if lead_days else first
     return {
         "product": product,
         "short": max(short_days.values()),
@@ -134,6 +137,7 @@ def purchase_needs(product, today=None, horizon_days=120, now=None):
         "order_by": order_by,
         "late": order_by < today,
         "owned": owned,
+        "lead_days": lead_days,
     }
 
 

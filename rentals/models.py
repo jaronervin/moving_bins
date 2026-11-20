@@ -231,6 +231,12 @@ class Product(models.Model):
         help_text="Take bookings as if you own this many, and buy more as bookings come in. "
         "Blank = only what you actually own.",
     )
+    lead_business_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Business days from deciding to buy more to having them ready (0 = same day). "
+        "Blank = the business setting.",
+    )
     spare_lid_product = models.ForeignKey(
         "self",
         on_delete=models.PROTECT,

@@ -13,7 +13,15 @@ from django.db import transaction
 from django.utils import timezone
 
 from . import inventory, pricing
-from .models import Booking, BookingLine, BusinessSettings, Package, PriceLine, Product
+from .models import Booking, BookingLine, BusinessSettings, Package, PriceLine, Product, counted
+
+
+def availability_message(product, wanted):
+    """What renters see when an item is past what we can promise online."""
+    s = BusinessSettings.load()
+    return (f"We'd need to check availability for {counted(wanted, product.name)} on those dates. "
+            f"Contact us at {s.contact_email} or {s.contact_phone} and we'll see if we can have "
+            f"them in time, or try fewer or other dates.")
 
 
 class NotEnoughStock(Exception):

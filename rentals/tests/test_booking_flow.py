@@ -116,7 +116,8 @@ class BookingFlowTests(FlowTestCase):
 
     def test_not_enough_totes(self):
         r = self.step_package("whole-home")  # 80 totes; we own 60 and have no planned capacity
-        self.assertContains(r, "We only have 60")
+        self.assertContains(r, "check availability for 80 27-gallon totes with lid")
+        self.assertContains(r, "Contact us at hello@sprouttoteco.com")
 
     def test_date_without_delivery(self):
         r = self.step_package(dropoff=self.dropoff + timedelta(days=1))
@@ -177,6 +178,51 @@ class BookingFlowTests(FlowTestCase):
         r = self.client.post("/book/review/", SIGN)
         self.assertRedirects(r, "/book/")
         self.assertEqual(Booking.objects.count(), 1)
+
+
+class ExtrasAvailabilityTests(FlowTestCase):
+    """Extras are booked against planning counts (none owned yet, bought the same day)."""
+
+    def to_extras(self, package="2br"):
+        self.step_package(package)
+
+    def test_launch_counts(self):
+        counts = {p.slug: (p.track_stock, p.planned_capacity, p.lead_business_days)
+                  for p in Product.objects.filter(kind="rental")}
+        self.assertEqual(counts["moving-blanket"], (True, 20, 0))
+        self.assertEqual(counts["dolly"], (True, 10, 0))
+        self.assertEqual(counts["wardrobe-box"], (False, None, 0))
+
+    def test_past_the_count_says_contact_us(self):
+        self.to_extras()
+        blanket = product("moving-blanket")
+        r = self.client.post("/book/extras/", {"addon_totes": 0, f"x_{blanket.pk}": 21})
+        self.assertContains(r, "check availability for 21 moving blankets")
+        r = self.client.post("/book/extras/", {"addon_totes": 0, f"x_{blanket.pk}": 20})
+        self.assertRedirects(r, "/book/addresses/")
+
+    def test_buy_when_needed_items_are_never_refused(self):
+        self.to_extras()
+        r = self.client.post("/book/extras/", {"addon_totes": 0, f"x_{product('wardrobe-box').pk}": 40})
+        self.assertRedirects(r, "/book/addresses/")
+
+    def test_contact_note_when_none_left(self):
+        p = product("appliance-dolly")
+        p.planned_capacity = 0
+        p.save()
+        self.to_extras()
+        page = self.client.get("/book/extras/").content.decode()
+        row = page[page.index("Appliance dolly"):page.index("Moving blanket")]
+        self.assertIn("for availability", row)
+        row = page[page.index("Moving blanket"):page.index("Wardrobe box")]
+        self.assertNotIn("for availability", row)
+
+    def test_owner_told_to_buy_same_day(self):
+        self.walk(extras={"moving-blanket": 4, "dish-divider": 2})
+        body = mail.outbox[1].body
+        self.assertIn("BUY MORE: with this booking, you need 4 more (Moving blanket)", body)
+        self.assertIn("(same day is fine)", body)
+        self.assertIn("2 more (Dish/glass divider)", body)
 
 
 class PlannedCapacityFlowTests(FlowTestCase):

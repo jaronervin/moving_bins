@@ -12,6 +12,6 @@ Total before tax: ${{ total }}
 
 {% if booking.status == "confirmed" %}Auto-confirmed. To decline or ask for a change, do it by {{ booking.review_until|date:"D M j, g:i A" }}: {{ ops_link }}{% else %}Hold expires {{ booking.hold_expires_at|date:"D M j, g:i A" }}.{% endif %}
 {% for need in needs %}
-BUY MORE: with this booking, you need {{ need.short }} more ({{ need.product }}) than the {{ need.owned }} you own, first on {{ need.first_date|date:"D M j" }}. {% if need.late %}Order now; that's inside your {{ lead_days }}-business-day lead time.{% else %}Order by {{ need.order_by|date:"D M j" }}.{% endif %}
+BUY MORE: with this booking, you need {{ need.short }} more ({{ need.product }}) than the {{ need.owned }} you own, first on {{ need.first_date|date:"D M j" }}. {% if need.late %}Order now; that's inside your {{ need.lead_days }}-business-day lead time.{% elif not need.lead_days %}Buy by {{ need.order_by|date:"D M j" }} (same day is fine).{% else %}Order by {{ need.order_by|date:"D M j" }}.{% endif %}
 {% endfor %}
 Details: {{ admin_link }}{% endautoescape %}
