@@ -300,3 +300,16 @@ class EmailEscapingTests(TestCase):
         body = render_to_string("rentals/email/declined_body.txt", {"booking": B, "site_url": "x"})
         self.assertIn("Pat O'Brien", body)
         self.assertIn("We're fully booked & can't fit you in.", body)
+
+
+class WindowTemplateAdminTests(TestCase):
+    def test_saving_a_pattern_fills_in_delivery_days(self):
+        from rentals.models import WindowTemplate
+        User.objects.create_superuser("boss", "b@example.com", "x")
+        self.client.login(username="boss", password="x")
+        r = self.client.post("/admin/rentals/windowtemplate/add/",
+                             {"weekday": 5, "start": "09:00", "end": "13:00", "max_stops": 4, "active": "on"},
+                             follow=True)
+        self.assertContains(r, "delivery day(s) for the next 60 days")
+        self.assertEqual(WindowTemplate.objects.count(), 1)
+        self.assertGreaterEqual(TimeWindow.objects.filter(date__week_day=7).count(), 8)  # Saturdays

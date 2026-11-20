@@ -185,8 +185,31 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(WindowTemplate)
 class WindowTemplateAdmin(admin.ModelAdmin):
+    """Weekly delivery pattern. Saving one fills in its dated delivery days
+    (the next 60 days) straight away; the daily job keeps extending them."""
+
     list_display = ["__str__", "max_stops", "active"]
     list_editable = ["max_stops", "active"]
+    actions = ["fill_delivery_days"]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        self._fill(request)
+
+    def _fill(self, request):
+        from .windows import generate_windows
+
+        created = generate_windows()
+        if created:
+            self.message_user(request, f"Added {created} delivery day(s) for the next 60 days.")
+
+    @admin.action(description="Fill in delivery days for the next 60 days")
+    def fill_delivery_days(self, request, queryset):
+        from .windows import generate_windows
+
+        created = generate_windows()
+        self.message_user(request, f"Added {created} delivery day(s)." if created
+                          else "Delivery days were already filled in for the next 60 days.")
 
 
 @admin.register(TimeWindow)
