@@ -41,6 +41,12 @@ The service area is a straight-line radius, so only address lookup is needed.
 3. Create an API key, restricted to that API.
 4. Run with `MAPS_BACKEND=google GOOGLE_MAPS_API_KEY=...`.
 
+**Address suggestions** as renters type (Addresses step and "add your moving-in address"):
+enable **Maps JavaScript API** and **Places API (New)**, create a second key restricted to those
+two APIs and to the site's web addresses, and set `GOOGLE_MAPS_BROWSER_KEY`. That key is public
+(it's in the page). Without it the boxes are plain text fields; the server still checks every
+address with the Geocoding API.
+
 ## Payments (Stripe)
 
 Without `STRIPE_SECRET_KEY` the site skips the card step (handy for local work).

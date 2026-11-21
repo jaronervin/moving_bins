@@ -313,3 +313,15 @@ class WindowTemplateAdminTests(TestCase):
         self.assertContains(r, "delivery day(s) for the next 60 days")
         self.assertEqual(WindowTemplate.objects.count(), 1)
         self.assertGreaterEqual(TimeWindow.objects.filter(date__week_day=7).count(), 8)  # Saturdays
+
+
+class AddressSuggestionTests(FlowTestCase):
+    def test_suggestions_only_with_a_browser_key(self):
+        self.step_package()
+        self.client.post("/book/extras/", {"addon_totes": 0})
+        self.assertNotContains(self.client.get("/book/addresses/"), "places-config")
+        with override_settings(GOOGLE_MAPS_BROWSER_KEY="browser-key"):
+            page = self.client.get("/book/addresses/")
+        self.assertContains(page, 'data-key="browser-key"')
+        self.assertContains(page, "rentals/address.js")
+        self.assertIn("places.googleapis.com", page["Content-Security-Policy"])

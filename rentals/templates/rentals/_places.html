@@ -1,0 +1,5 @@
+{% load static %}{% if places_key %}
+{# Address suggestions for any "...-line1" box on the page (rentals/static/rentals/address.js). #}
+<div id="places-config" hidden data-key="{{ places_key }}" data-lat="{{ site_settings.base_lat }}" data-lng="{{ site_settings.base_lng }}"></div>
+<script src="{% static 'rentals/address.js' %}"></script>
+{% endif %}

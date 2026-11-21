@@ -1,4 +1,5 @@
 {% extends "rentals/base.html" %}
+{% load static %}
 {% block title %}Addresses · Sprout Tote Co.{% endblock %}
 {% block content %}
 {% include "rentals/book/_steps.html" %}
@@ -19,4 +20,5 @@
 </div>
 <button type="submit" class="narrow">Continue</button>
 </form>
+{% include "rentals/_places.html" %}
 {% endblock %}

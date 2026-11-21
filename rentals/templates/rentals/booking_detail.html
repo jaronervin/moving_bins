@@ -119,4 +119,5 @@
   {% endif %}
 </section>
 {% endif %}
+{% if pickup_form and not booking.pickup_address %}{% include "rentals/_places.html" %}{% endif %}
 {% endblock %}
