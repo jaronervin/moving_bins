@@ -167,7 +167,7 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 # Publishable keys are public (they go in the web page).
 STRIPE_PUBLISHABLE_KEY = os.environ.get(
     "STRIPE_PUBLISHABLE_KEY",
-    "pk_test_51UdsQ1ItEfnAO89A5N6UxIeXmfeU64l8qkjCWptBSE2273tXP8dpaB0JPzTNJVGrQXYmwCd15yfsPJjlDTF40gfr00VoRQv6gh",
+    "pk_test_51Udx0gI50o8UHatSoSCvj1YWC83jBFsSHhedDqqWwyqp2KaYj88exNUagxHl3KE3yz9Z43PAFsiOwQhiUh85O7PB00oIwnHaS6",
 )
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 # Optional: a payment method configuration limited to cards (and Link), since
