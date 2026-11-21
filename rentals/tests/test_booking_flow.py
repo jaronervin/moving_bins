@@ -351,8 +351,23 @@ class AreaCheckTests(TestCase):
         self.assertIn("adds $25", r["message"])
         r = self.check("Frederick 21702")
         self.assertEqual(r["status"], "out")
-        self.assertIn("about 48 miles", r["message"])
+        self.assertIn("about 48 miles from us", r["message"])
         self.assertEqual(self.check("x")["status"], "error")
+
+    def test_far_off_match_is_not_found(self):
+        from rentals import maps
+        far = maps.Place(formatted="Somewhere, TX 75001, USA", lat=33, lng=-97, place_id="p")
+        with unittest.mock.patch.object(maps, "lookup", return_value=(far, 1300.0)):
+            r = self.check("zzzz qqqq")
+        self.assertEqual(r["status"], "error")
+        self.assertIn("couldn't find that near Baltimore", r["message"])
+
+    def test_building_names_are_not_used_as_the_street(self):
+        from rentals.booking_flow import _split_formatted
+        self.assertEqual(_split_formatted("Legg Mason Building, 100 Light St, Baltimore, MD 21202, USA")["line1"],
+                         "100 Light St")
+        self.assertIsNone(_split_formatted("Towson, MD, USA"))
+        self.assertIsNone(_split_formatted("Cape St Claire, MD 21401, USA"))
 
     def test_checked_address_prefills_the_addresses_step(self):
         from rentals import maps

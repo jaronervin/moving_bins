@@ -294,9 +294,10 @@ def _split_formatted(formatted):
     if parts and parts[-1] in ("USA", "United States"):
         parts = parts[:-1]
     found = re.match(r"([A-Z]{2})\s+(\d{5})", parts[-1]) if len(parts) >= 3 else None
-    if not found:
+    street = parts[-3] if found else ""
+    if not re.match(r"\d", street):  # a town or ZIP, not a street address: nothing to prefill
         return None
-    return {"line1": parts[0], "line2": "", "city": parts[-2], "state": found.group(1),
+    return {"line1": street, "line2": "", "city": parts[-2], "state": found.group(1),
             "zip_code": found.group(2)}
 
 
@@ -316,17 +317,21 @@ def check_area(request):
         message = "Type a street address, town or ZIP code."
     else:
         request.session["area_checks"] = checks + 1
+        not_found = "We couldn't find that near Baltimore. Try a street address, town or ZIP code."
         try:
             place, miles = maps.lookup({"line1": text}, s.base_lat, s.base_lng, precise=False)
-            fee = pricing.zone_fee(miles, s.free_radius_miles, s.max_radius_miles, s.extended_zone_fee,
-                                   what="That address")
+            if miles > 3 * s.max_radius_miles:  # matched somewhere far off: probably not what they meant
+                raise maps.AddressNotFound(not_found)
+            fee = pricing.zone_fee(miles, s.free_radius_miles, s.max_radius_miles, s.extended_zone_fee)
         except maps.AddressNotFound:
-            message = "We couldn't find that. Try a street address, town or ZIP code."
+            message = not_found
         except maps.MapsUnavailable:
             message = "We couldn't check that right now. Please try again in a minute."
-        except pricing.OutOfRange as exc:
+        except pricing.OutOfRange:
             status = "out"
-            message = (f"Sorry, we don't deliver there yet. {exc} If you're just outside, email "
+            shown = f"{miles:.1f}" if round(miles) <= s.max_radius_miles else f"{miles:.0f}"
+            message = (f"Sorry, we don't deliver there yet: it's about {shown} miles from us in a straight "
+                       f"line, and we go up to {s.max_radius_miles}. If you're just outside, email "
                        f"{s.contact_email}; we may be able to help.")
         else:
             where = place.formatted.replace(", USA", "")
