@@ -83,6 +83,27 @@ def index(request):
     })
 
 
+@staff_required
+def day(request):
+    """One day's dropoffs and pickups in driving order, with a route link."""
+    from datetime import date as date_cls
+
+    from . import routes
+
+    try:
+        day = date_cls.fromisoformat(request.GET.get("date", ""))
+    except ValueError:
+        day = timezone.localdate()
+    stops = routes.stops_for(day)
+    return render(request, "rentals/ops/day.html", {
+        "day": day, "prev": day - timedelta(days=1), "next": day + timedelta(days=1),
+        "stops": stops, "links": routes.maps_links(stops),
+        "dropoffs": sum(1 for s in stops if s.kind == "dropoff"),
+        "pickups": sum(1 for s in stops if s.kind == "pickup"),
+        "missing": [s for s in stops if not s.address],
+    })
+
+
 def _booking(reference):
     return get_object_or_404(Booking.objects.select_related("customer"), reference=reference)
 

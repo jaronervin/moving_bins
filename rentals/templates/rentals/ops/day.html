@@ -1,0 +1,42 @@
+{% extends "rentals/ops/_base.html" %}
+{% load rentals_extras %}
+{% block ops_title %}Route {{ day|date:"M j" }}{% endblock %}
+{% block ops %}
+<div class="day-head">
+  <a href="?date={{ prev|date:'Y-m-d' }}" aria-label="Previous day">‹ {{ prev|date:"D" }}</a>
+  <h1>{{ day|date:"l, M j" }}</h1>
+  <a href="?date={{ next|date:'Y-m-d' }}" aria-label="Next day">{{ next|date:"D" }} ›</a>
+</div>
+<p class="muted">{{ dropoffs }} dropoff{{ dropoffs|pluralize }} · {{ pickups }} pickup{{ pickups|pluralize }}.
+  Ordered nearest-first from base; drag stops around in Google Maps if traffic says otherwise.</p>
+{% if links %}
+  <p class="button-row">{% for link in links %}<a class="button inline" href="{{ link }}" target="_blank" rel="noopener">Open route in Google Maps{% if links|length > 1 %} ({{ forloop.counter }} of {{ links|length }}){% endif %}</a>{% endfor %}</p>
+{% endif %}
+{% for s in missing %}
+  <section class="card attention"><b>{{ s.booking.reference }}</b>: no moving-in address yet for this pickup.
+    Call {{ s.booking.customer.name }} at <a href="tel:{{ s.booking.customer.phone }}">{{ s.booking.customer.phone }}</a>.</section>
+{% endfor %}
+<ol class="stops">
+  {% for s in stops %}
+  <li class="card stop stop-{{ s.kind }}">
+    <div class="stop-head">
+      <span class="badge">{% if s.kind == "dropoff" %}Drop off by {{ s.window.end|time:"g:i A" }}{% else %}Pick up from {{ s.window.start|time:"g:i A" }}{% endif %}</span>
+      <b>{{ s.booking.customer.name }}</b> <span class="muted">{{ s.booking.reference }}</span>
+    </div>
+    <p>{% if s.where %}<a href="https://www.google.com/maps/search/?api=1&query={{ s.where|urlencode }}" target="_blank" rel="noopener">{{ s.where }}</a>{% else %}<span class="error">Address needed</span>{% endif %}</p>
+    <p>{% for line in s.booking.lines.all %}{{ line.quantity|counted:line.product.name }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+    <p class="muted">{{ s.booking.get_presence_display }}{% if s.booking.time_request %} · <b>{{ s.booking.time_request }}</b>{% endif %}
+      {% if s.booking.customer.phone %} · <a href="tel:{{ s.booking.customer.phone }}">{{ s.booking.customer.phone }}</a>{% endif %}</p>
+    {% if s.booking.access_notes %}<p class="muted">Notes: {{ s.booking.access_notes }}</p>{% endif %}
+    <p class="stop-actions">
+      {% if s.kind == "dropoff" %}<a href="{% url 'ops_scanner' s.booking.reference 'load' %}">Load totes</a>
+      {% else %}<a href="{% url 'ops_scanner' s.booking.reference 'pickup' %}">Scan pickup</a>{% endif %}
+      · <a href="{% url 'admin:rentals_booking_change' s.booking.pk %}">Booking</a>
+      {% if s.visit.status == "done" %}<span class="badge">Done</span>{% endif %}
+    </p>
+  </li>
+  {% empty %}
+  <li class="card">Nothing scheduled.</li>
+  {% endfor %}
+</ol>
+{% endblock %}

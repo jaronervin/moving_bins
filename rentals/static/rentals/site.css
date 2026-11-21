@@ -188,3 +188,15 @@ button.secondary { background: var(--bg); color: var(--ink); border: 1px solid v
 button.danger { background: var(--warn); border-color: var(--warn); }
 .manage-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0 0; }
 .button.inline { display: inline-block; margin: 0; padding: 10px 20px; }
+/* Owner route view */
+.day-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.day-head h1 { margin: 0; font-size: 1.5rem; text-align: center; }
+.stops { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 12px;
+         counter-reset: stop; }
+.stop { counter-increment: stop; position: relative; padding-left: 52px; }
+.stop::before { content: counter(stop); position: absolute; left: 16px; top: 18px; width: 26px; height: 26px;
+                border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700;
+                display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.stop p { margin: 6px 0 0; }
+.stop-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.stop-pickup .badge { background: var(--bg); }

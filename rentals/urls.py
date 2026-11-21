@@ -30,6 +30,7 @@ urlpatterns = [
     path("tote/", totes.find_tote, name="find_tote"),
     # Owner tools (staff only)
     path("ops/", ops.index, name="ops_index"),
+    path("ops/day/", ops.day, name="ops_day"),
     path("ops/bin/<str:code>/", ops.bin_detail, name="ops_bin"),
     path("ops/b/<str:reference>/<str:mode>/", ops.scanner, name="ops_scanner"),
     path("ops/check-in/", ops.check_in, name="ops_check_in"),

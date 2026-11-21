@@ -209,3 +209,36 @@ class ReminderTests(FlowTestCase):
         with mock.patch.object(services.timezone, "now", return_value=two_before):
             services.add_week(booking)
         self.assertEqual(send_reminders(two_before + timedelta(days=7)), (0, 1))
+
+
+class RouteViewTests(FlowTestCase):
+    def test_day_view_orders_stops_and_links_to_maps(self):
+        from rentals import routes
+        self.drop_window.max_stops = 3
+        self.drop_window.save()
+        self.walk(package="studio", pickup_zip="21401")  # dropoff 21218 (4 mi)
+        self.client.cookies.clear()
+        self.walk(package="studio")
+        far, near = Booking.objects.order_by("pk")
+        from rentals.models import Address
+        Address.objects.filter(pk=far.dropoff_address_id).update(lat=D("39.60"), lng=D("-76.563"))  # ~17 mi north
+        stops = routes.stops_for(self.dropoff)
+        self.assertEqual([s.booking for s in stops], [near, far])
+        links = routes.maps_links(stops)
+        self.assertEqual(len(links), 1)
+        self.assertIn("waypoints=10+Elm+St", links[0])
+
+        self.client.login(username="owner", password="x")
+        page = self.client.get(f"/ops/day/?date={self.dropoff.isoformat()}")
+        self.assertContains(page, "2 dropoffs · 0 pickups")
+        self.assertContains(page, "Open route in Google Maps")
+        self.assertContains(page, "Drop off by 1:00 PM")
+        self.assertEqual(self.client.get("/ops/day/?date=nonsense").status_code, 200)
+
+    def test_long_days_split_into_legs(self):
+        from rentals import routes
+        stops = [NS(where=f"{i} Main St, Baltimore, MD", kind="dropoff") for i in range(1, 15)]
+        links = routes.maps_links(stops)
+        self.assertEqual(len(links), 2)
+        self.assertIn("destination=10+Main+St", links[0])
+        self.assertIn("origin=10+Main+St", links[1])
