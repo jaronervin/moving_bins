@@ -116,8 +116,7 @@ def start_card_setup(booking, return_url, updating=False):
         # label here), so say what it does just above it.
         "custom_text": {"submit": {"message": (
             "Saving replaces the card on your booking. Nothing is charged now." if updating else
-            "Saving your card completes your booking. Nothing is charged now; we hold the total "
-            "the day before dropoff and charge it when your totes arrive.")}},
+            "Clicking Save completes your booking. Nothing is charged now.")}},
         "integration_identifier": f"sprouttote-card-setup-{_tag()}",
         **_payment_method_configuration(),
     })

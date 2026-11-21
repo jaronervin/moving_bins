@@ -4,10 +4,15 @@
 {% block content %}
 <h1>{% if updating %}Update your card{% else %}Add a card{% endif %}</h1>
 <p class="lede">{% if updating %}Your new card replaces the old one for this booking.{% else %}
-  Booking {{ booking.reference }}: your card is saved securely with Stripe. <b>Nothing is charged now</b>;
-  we place a hold the day before dropoff and charge it when your totes are delivered.{% endif %}</p>
+  Booking {{ booking.reference }}: one last step. Your card is stored securely by Stripe; we never see the full number.{% endif %}</p>
 <div class="grid">
   <section class="card">
+    {% if not updating %}
+    <div class="callout" role="note">
+      <b>Saving your card completes your booking.</b>
+      <span>Nothing is charged now. We hold the total the day before dropoff and charge it when your totes arrive.</span>
+    </div>
+    {% endif %}
     <div id="checkout" data-publishable-key="{{ publishable_key }}" data-session-url="{{ session_url }}">
       <p class="muted" id="checkout-loading">Loading secure card form…</p>
     </div>

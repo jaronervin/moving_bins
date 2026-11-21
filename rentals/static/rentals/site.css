@@ -164,3 +164,8 @@ button.secondary { background: var(--bg); color: var(--ink); border: 1px solid v
 .suggest-list li[aria-selected="true"], .suggest-list li:hover { background: var(--bg); }
 .suggest-list li.suggest-credit { cursor: default; text-align: right; font-size: 12px; color: var(--muted); padding: 4px 12px; }
 .suggest-list li.suggest-credit:hover { background: none; }
+
+/* A note that must not be missed (card page) */
+.callout { display: flex; flex-direction: column; gap: 4px; margin: 0 0 16px; padding: 14px 16px;
+           background: var(--bg); border: 2px solid var(--accent); border-radius: 10px; font-size: 16px; }
+.callout b { color: var(--accent); font-size: 17px; }
