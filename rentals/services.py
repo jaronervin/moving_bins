@@ -302,6 +302,18 @@ class CannotDecline(Exception):
     pass
 
 
+def _unload(booking, note):
+    """Put any totes already scanned onto this booking's load back on the shelf,
+    and cancel its dropoff/pickup visits (freeing the delivery stops)."""
+    from .models import Bin, BinEvent, StockState, Visit
+
+    for b in Bin.objects.select_for_update().filter(booking=booking, status=StockState.OUT):
+        b.status, b.booking = StockState.READY, None
+        b.save(update_fields=["status", "booking"])
+        BinEvent.objects.create(bin=b, kind=BinEvent.Kind.UNLOADED, booking=booking, note=note)
+    booking.visits.update(status=Visit.Status.CANCELLED)
+
+
 def _check_review_window(booking, now):
     if booking.status != Booking.Status.CONFIRMED:
         raise CannotDecline(f"{booking.reference} is {booking.get_status_display().lower()}.")
@@ -317,16 +329,9 @@ def decline_booking(booking, reason, now=None):
     Nothing has been charged yet (cards are charged at dropoff), so the renter
     owes nothing. Any totes already scanned onto the load go back on the shelf.
     """
-    from .models import Bin, BinEvent, StockState, Visit
-
     now = now or timezone.now()
     _check_review_window(booking, now)
-    for b in Bin.objects.select_for_update().filter(booking=booking, status=StockState.OUT):
-        b.status, b.booking = StockState.READY, None
-        b.save(update_fields=["status", "booking"])
-        BinEvent.objects.create(bin=b, kind=BinEvent.Kind.UNLOADED, booking=booking,
-                                note="Booking declined")
-    booking.visits.update(status=Visit.Status.CANCELLED)
+    _unload(booking, "Booking declined")
     booking.status = Booking.Status.DECLINED
     booking.decline_reason = reason.strip()
     booking.cancelled_at = now
@@ -348,6 +353,77 @@ def request_change(booking, message, now=None):
     booking.change_requested_at = now
     booking.save(update_fields=["change_request", "change_requested_at", "updated_at"])
     return booking
+
+
+# ---------------------------------------------------------------------------
+# Cancelling (renter from their booking page, or owners)
+# ---------------------------------------------------------------------------
+
+CANCELLABLE_STATUSES = [Booking.Status.AWAITING_CARD, Booking.Status.REQUESTED,
+                        Booking.Status.TIMES_PROPOSED, Booking.Status.CONFIRMED]
+
+
+class CannotCancel(Exception):
+    pass
+
+
+def dropoff_starts_at(booking):
+    """When the dropoff day's window opens (midnight if no window yet)."""
+    from datetime import datetime, time
+
+    visit = booking.visits.filter(kind="dropoff").select_related("window", "requested_window").first()
+    window = visit and (visit.window or visit.requested_window)
+    if window:
+        return window.starts_at
+    return timezone.make_aware(datetime.combine(booking.dropoff_date, time(0)))
+
+
+def cancel_fee(booking, now=None):
+    """What a renter would pay to cancel right now (0 before the cutoff, or if
+    nothing was committed yet)."""
+    now = now or timezone.now()
+    s = BusinessSettings.load()
+    if booking.status != Booking.Status.CONFIRMED:
+        return pricing.ZERO
+    if now < dropoff_starts_at(booking) - timedelta(hours=s.cancel_cutoff_hours):
+        return pricing.ZERO
+    rental = sum((l.amount for l in booking.price_lines.filter(kind__in=["package", "addon", "rental"])),
+                 pricing.ZERO)
+    return pricing.late_cancel_charge(rental, s.late_cancel_charge_percent)
+
+
+def free_cancel_until(booking):
+    return dropoff_starts_at(booking) - timedelta(hours=BusinessSettings.load().cancel_cutoff_hours)
+
+
+@transaction.atomic
+def cancel_booking(booking, by_owner=False, now=None):
+    """Cancel before dropoff. Returns the late-cancellation Charge, if one was made.
+
+    Renters cancelling inside the cutoff pay ``late_cancel_charge_percent`` of
+    the rental (taken from the card hold if there is one). Owners never charge
+    a fee here. Any card hold is released; totes and delivery stops are freed.
+    """
+    from . import payments
+
+    now = now or timezone.now()
+    booking = Booking.objects.select_for_update().get(pk=booking.pk)
+    if booking.status not in CANCELLABLE_STATUSES:
+        raise CannotCancel(f"{booking.reference} is {booking.get_status_display().lower()} and can't be "
+                           "cancelled online. Please contact us.")
+    fee = pricing.ZERO if by_owner else cancel_fee(booking, now)
+    late_charge = None
+    if payments.enabled():
+        if fee and booking.stripe_payment_method_id:
+            late_charge = payments.charge_late_cancel(booking)
+        else:
+            payments.release(booking)
+    _unload(booking, "Booking cancelled")
+    booking.status = Booking.Status.CANCELLED
+    booking.cancelled_at = now
+    booking.hold_expires_at = None
+    booking.save()
+    return late_charge
 
 
 # ---------------------------------------------------------------------------

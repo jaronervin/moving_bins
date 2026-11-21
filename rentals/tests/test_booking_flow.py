@@ -391,3 +391,19 @@ class AreaCheckTests(TestCase):
         inventory.record_purchase(bins(), 1)
         self.assertContains(self.client.get("/"), "Do we deliver to you?")
         self.assertContains(self.client.get("/book/"), "Do we deliver to you?")
+
+
+class AdminCancelTests(FlowTestCase):
+    def test_bulk_cancel_frees_totes(self):
+        self.walk()
+        booking = Booking.objects.get()
+        self.assertLess(inventory.available(bins(), self.dropoff, self.pickup), 60)
+        User.objects.create_superuser("boss", "b@example.com", "x")
+        self.client.login(username="boss", password="x")
+        r = self.client.post("/admin/rentals/booking/", {"action": "cancel_selected", "_selected_action": [booking.pk]},
+                             follow=True)
+        self.assertContains(r, "Cancelled 1 booking")
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "cancelled")
+        self.assertEqual(inventory.available(bins(), self.dropoff, self.pickup), 60)
+        self.assertTrue(all(v.status == "cancelled" for v in booking.visits.all()))

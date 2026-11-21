@@ -166,6 +166,23 @@ class BookingAdmin(admin.ModelAdmin):
     autocomplete_fields = ["customer"]
     raw_id_fields = ["dropoff_address", "pickup_address"]
     inlines = [PriceLineInline, BookingLineInline, VisitInline, ChargeInline, CheckInInline]
+    actions = ["cancel_selected"]
+
+    @admin.action(description="Cancel selected bookings (no fee, no email: for test or duplicate bookings)")
+    def cancel_selected(self, request, queryset):
+        from . import services
+
+        done, skipped = 0, []
+        for booking in queryset:
+            try:
+                services.cancel_booking(booking, by_owner=True)
+                done += 1
+            except services.CannotCancel:
+                skipped.append(booking.reference)
+        self.message_user(request, f"Cancelled {done} booking(s); their totes and delivery stops are free again.")
+        if skipped:
+            self.message_user(request, "Not cancelled (already finished, cancelled or out with the renter): "
+                              + ", ".join(skipped), level="warning")
 
     @admin.display(description="Units")
     def bins(self, obj):
