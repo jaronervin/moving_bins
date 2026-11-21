@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import booking_flow, ops, payment_views, totes, views
+from . import booking_flow, ops, payment_views, renter_views, totes, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -17,6 +17,9 @@ urlpatterns = [
     path("b/<str:token>/card/session", payment_views.card_session, name="card_session"),
     path("b/<str:token>/card/done", payment_views.card_done, name="card_done"),
     path("b/<str:token>/sign/", payment_views.resign, name="resign"),
+    path("b/<str:token>/cancel/", renter_views.cancel, name="renter_cancel"),
+    path("b/<str:token>/change/", renter_views.change, name="renter_change"),
+    path("b/<str:token>/add-week/", renter_views.add_week, name="renter_add_week"),
     path("b/<str:token>/agreement/", views.signed_agreement, name="signed_agreement"),
     path("agreement/", views.agreement, name="agreement"),
     path("stripe/webhook/", payment_views.stripe_webhook, name="stripe_webhook"),

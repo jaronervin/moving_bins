@@ -60,6 +60,40 @@ def booking_declined(booking):
           "rentals/email/declined_body.txt", {"booking": booking, "site_url": settings.SITE_URL})
 
 
+def booking_cancelled(booking, late_charge=None):
+    """To the renter after they cancel online; heads-up to the owners."""
+    s = BusinessSettings.load()
+    _send([booking.customer.email], "rentals/email/cancelled_subject.txt", "rentals/email/cancelled_body.txt",
+          {"booking": booking, "late_charge": late_charge, "contact_email": s.contact_email,
+           "site_url": settings.SITE_URL})
+    fee = f" Late-cancellation charge: ${late_charge.total} ({late_charge.get_status_display()})." if late_charge else ""
+    owner_alert(f"Cancelled: {booking.reference}",
+                f"{booking.customer.name} cancelled {booking.reference} (dropoff {booking.dropoff_date:%a %b %-d})."
+                f"{fee} The totes and delivery stops are free again.")
+
+
+def booking_changed(booking):
+    """To the renter after they change their booking online; heads-up to the owners."""
+    s = BusinessSettings.load()
+    total = sum((line.amount for line in booking.price_lines.all()), 0)
+    _send([booking.customer.email], "rentals/email/changed_subject.txt", "rentals/email/changed_body.txt",
+          {"booking": booking, "total": total, "link": booking_url(booking, absolute=True),
+           "contact_email": s.contact_email})
+    owner_alert(f"Changed: {booking.reference}",
+                f"{booking.customer.name} changed {booking.reference}: {booking.package} for {booking.weeks} weeks, "
+                f"dropoff {booking.dropoff_date:%a %b %-d}, pickup {booking.pickup_date:%a %b %-d}. "
+                f"New total before tax: ${total}.")
+
+
+def booking_extended(booking, charge=None):
+    """To the renter after they add a week; heads-up to the owners."""
+    _send([booking.customer.email], "rentals/email/extended_subject.txt", "rentals/email/extended_body.txt",
+          {"booking": booking, "charge": charge, "link": booking_url(booking, absolute=True)})
+    owner_alert(f"Extra week: {booking.reference}",
+                f"{booking.customer.name} added a week to {booking.reference}. "
+                f"Pickup is now {booking.pickup_date:%a %b %-d}.")
+
+
 def change_requested(booking):
     """To the renter when the owners ask for a change during the review window."""
     _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",

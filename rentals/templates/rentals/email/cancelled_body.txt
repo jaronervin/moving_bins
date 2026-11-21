@@ -1,0 +1,14 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Your booking {{ booking.reference }} (dropoff {{ booking.dropoff_date|date:"l, F j" }}) is cancelled.
+{% if late_charge %}
+Because it was cancelled less than our cancellation window before dropoff,
+there's a late-cancellation charge of ${{ late_charge.total }} to your card.{% if late_charge.status == "failed" %}
+Your card didn't go through for it; we'll be in touch.{% endif %}
+{% else %}
+Nothing was charged, and you don't owe anything.
+{% endif %}
+If your plans change again, you're welcome to book any time:
+{{ site_url }}/book/
+
+Questions? {{ contact_email }}{% endautoescape %}

@@ -1,0 +1,8 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+You've got your totes for another week. Your new pickup day is
+{{ booking.pickup_date|date:"l, F j" }}.
+{% if charge %}
+We charged ${{ charge.total }} for the extra week to your card.
+{% endif %}
+Your booking: {{ link }}{% endautoescape %}

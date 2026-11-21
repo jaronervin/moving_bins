@@ -183,3 +183,8 @@ button.secondary { background: var(--bg); color: var(--ink); border: 1px solid v
 .area-result.out, .area-result.error { color: var(--warn); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .fine { font-size: .9rem; margin: 8px 0 0; }
+.callout.warn { border-color: var(--warn); }
+.callout.warn b { color: var(--warn); }
+button.danger { background: var(--warn); border-color: var(--warn); }
+.manage-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0 0; }
+.button.inline { display: inline-block; margin: 0; padding: 10px 20px; }

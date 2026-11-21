@@ -1,0 +1,15 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Your booking {{ booking.reference }} is updated:
+
+  {{ booking.package.name }}, {{ booking.weeks }} weeks
+  Dropoff: {{ booking.dropoff_date|date:"l, F j" }}
+  Pickup:  {{ booking.pickup_date|date:"l, F j" }}
+
+{% for line in booking.price_lines.all %}  {% if line.quantity > 1 %}{{ line.quantity }} x {% endif %}{{ line.description }}: ${{ line.amount }}
+{% endfor %}  Total before tax: ${{ total }}
+
+Nothing is charged until your totes are dropped off.
+
+See or change your booking: {{ link }}
+Questions? {{ contact_email }}{% endautoescape %}

@@ -87,6 +87,26 @@
       extends a week for ${{ booking.renewal_week_price }}. Questions? <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a></p>
   </section>
 </div>
+{% if can_change or can_cancel or can_add_week %}
+<section class="card" id="manage">
+  <h2>Need to change something?</h2>
+  {% if can_add_week %}
+    <p>Need the totes longer? Add a week for ${{ booking.renewal_week_price }}. Pickup moves to
+      {{ booking.pickup_date|add_days:7|date:"l, M j" }}.</p>
+  {% elif can_change %}
+    <p class="muted">Change your package, dates or extras, or cancel for free, until
+      {{ changes_until|date:"l, M j \a\t g:i A" }}.{% if late_fee %} After that, cancelling costs ${{ late_fee }}.{% endif %}</p>
+  {% elif can_cancel %}
+    <p class="muted">It's within {{ settings.cancel_cutoff_hours }} hours of dropoff, so changes need a quick email to
+      <a href="mailto:{{ settings.contact_email }}">{{ settings.contact_email }}</a>.</p>
+  {% endif %}
+  <p class="manage-links">
+    {% if can_add_week %}<a class="button inline" href="{% url 'renter_add_week' token %}">Keep them another week</a>{% endif %}
+    {% if can_change %}<a href="{% url 'renter_change' token %}">Change booking</a>{% endif %}
+    {% if can_cancel %}<a href="{% url 'renter_cancel' token %}">Cancel booking</a>{% endif %}
+  </p>
+</section>
+{% endif %}
 {% if totes or totes_editable %}
 <section class="card totes" id="totes">
   <div class="totes-head">

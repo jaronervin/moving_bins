@@ -1,0 +1,25 @@
+{% extends "rentals/base.html" %}
+{% block title %}Cancel booking · Sprout Tote Co.{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  <h1>Cancel booking <span class="nowrap">{{ booking.reference }}</span>?</h1>
+  <p>Dropoff {{ booking.dropoff_date|date:"l, F j" }}, pickup {{ booking.pickup_date|date:"l, F j" }}.</p>
+  {% if fee %}
+    <div class="callout warn" role="note">
+      <b>A late-cancellation charge of ${{ fee }} applies.</b>
+      <span>Cancelling within {{ settings.cancel_cutoff_hours }} hours of dropoff costs {{ settings.late_cancel_charge_percent }}%
+        of the rental. It's charged to your saved card.</span>
+    </div>
+  {% else %}
+    <div class="callout" role="note">
+      <b>Cancelling now is free.</b>
+      <span>{% if booking.status == "confirmed" %}Free cancellation until {{ free_until|date:"l, M j \a\t g:i A" }}.{% else %}Nothing has been charged.{% endif %}</span>
+    </div>
+  {% endif %}
+  <form method="post">{% csrf_token %}
+    <button type="submit" class="danger">Yes, cancel my booking</button>
+  </form>
+  <p><a href="{% url 'booking_detail' token %}">Keep my booking</a>{% if booking.status == "confirmed" %} ·
+    <a href="{% url 'renter_change' token %}">Change it instead</a>{% endif %}</p>
+</section>
+{% endblock %}

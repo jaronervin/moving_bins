@@ -1,0 +1,16 @@
+{% extends "rentals/base.html" %}
+{% block title %}Keep them another week · Sprout Tote Co.{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  <h1>Keep your totes another week?</h1>
+  <p>Your pickup moves from {{ booking.pickup_date|date:"l, F j" }} to <b>{{ new_pickup|date:"l, F j" }}</b>.</p>
+  <div class="callout" role="note">
+    <b>${{ booking.renewal_week_price }} for the extra week</b>
+    <span>{% if payments_on %}Charged to your saved card now.{% else %}Added to your booking.{% endif %}</span>
+  </div>
+  <form method="post">{% csrf_token %}
+    <button type="submit">Add a week</button>
+  </form>
+  <p><a href="{% url 'booking_detail' token %}">Back to my booking</a></p>
+</section>
+{% endblock %}

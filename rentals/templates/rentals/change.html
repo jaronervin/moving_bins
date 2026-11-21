@@ -1,0 +1,64 @@
+{% extends "rentals/base.html" %}
+{% block title %}Change booking · Sprout Tote Co.{% endblock %}
+{% block content %}
+<h1>Change booking <span class="nowrap">{{ booking.reference }}</span></h1>
+<p class="lede">Change your package, dates or extras until {{ until|date:"l, M j \a\t g:i A" }}.
+  Your addresses stay the same; <a href="mailto:{{ settings.contact_email }}">contact us</a> to change those.</p>
+<form method="post">{% csrf_token %}
+  {{ form.non_field_errors }}
+  <h2>Package</h2>
+  {{ form.package.errors }}
+  <div class="packages">
+    {% for p in packages %}
+    <label class="package">
+      <input type="radio" name="package" value="{{ p.pk }}"
+        {% if form.package.value|stringformat:"s" == p.pk|stringformat:"s" %}checked{% endif %} required>
+      <span class="package-name">{{ p.name }}</span>
+      <span class="package-price">${{ p.price|floatformat:"-2" }}</span>
+      <span class="muted">{{ settings.min_weeks }} weeks · +${{ p.extra_week_price|floatformat:"-2" }}/extra week</span>
+      <span class="package-items"><b>{{ p.totes }} totes</b>{% for item in p.items.all %} · {{ item.label }}{% endfor %}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <div class="grid">
+    <section class="card">
+      <h2>Dates</h2>
+      {{ form.weeks.label_tag }} {{ form.weeks }} {{ form.weeks.errors }}
+      {{ form.dropoff_date.label_tag }} {{ form.dropoff_date }} {{ form.dropoff_date.errors }}
+      {% if open_dates %}<p class="muted">Next days we deliver:
+        {% for d in open_dates %}{{ d|date:"D M j" }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+      <h2>Extras</h2>
+      {{ extras_form.non_field_errors }}
+      <div class="qty-row">
+        <label for="{{ extras_form.addon_totes.id_for_label }}">Extra totes
+          <span class="muted">${{ tote.addon_price|floatformat:"-2" }} each for {{ settings.min_weeks }} weeks, then ${{ tote.addon_extra_week_price|floatformat:"-2" }}/week</span></label>
+        {{ extras_form.addon_totes }}
+      </div>
+      {% for p, field in rentals %}
+        <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span></label>{{ field }}</div>
+      {% endfor %}
+      {% for p, field in sales %}
+        <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }} (yours to keep)</span></label>{{ field }}</div>
+      {% endfor %}
+    </section>
+    <section class="card summary">
+      {% if preview %}
+        <h2>New price</h2>
+        <table>
+          {% for line in preview.lines %}<tr><td>{% if line.quantity > 1 %}{{ line.quantity }} × {% endif %}{{ line.description }}</td>
+            <td class="num">${{ line.amount }}</td></tr>{% endfor %}
+          <tr class="total"><td>New total before tax</td><td class="num">${{ preview.total_before_tax }}</td></tr>
+        </table>
+        <p class="muted">Was ${{ current_total }}. Nothing is charged until dropoff.</p>
+        <button type="submit" name="confirm" value="1">Confirm changes</button>
+        <button type="submit" class="secondary">Update price</button>
+      {% else %}
+        <h2>Now</h2>
+        <p class="muted">Total before tax: ${{ current_total }}</p>
+        <button type="submit">See the new price</button>
+      {% endif %}
+      <p class="muted"><a href="{% url 'booking_detail' token %}">Back to my booking</a></p>
+    </section>
+  </div>
+</form>
+{% endblock %}

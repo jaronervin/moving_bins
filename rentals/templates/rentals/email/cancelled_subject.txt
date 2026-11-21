@@ -1,0 +1,1 @@
+{% autoescape off %}Your Sprout Tote Co. booking {{ booking.reference }} is cancelled{% endautoescape %}

@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from . import emails, inventory, links, maps, payment_views, pricing, services, totes
 from .forms import FindBookingForm, PickupAddressForm
@@ -71,9 +72,25 @@ def booking_detail(request, token):
         "settings": BusinessSettings.load(),
         **payment_views.booking_payment_context(booking),
         "token": token,
+        **_manage_context(booking),
         "totes": totes.totes_for(booking),
         "totes_editable": booking.status == Booking.Status.OUT,
     })
+
+
+def _manage_context(booking):
+    """What the renter can do themselves from their booking page."""
+    now = timezone.now()
+    can_change = (booking.status in services.CHANGEABLE_STATUSES and booking.package_id is not None
+                  and now < services.changes_allowed_until(booking))
+    return {
+        "can_change": can_change,
+        "can_cancel": booking.status in services.CANCELLABLE_STATUSES,
+        "can_add_week": booking.status == Booking.Status.OUT and timezone.localdate() < booking.pickup_date,
+        "changes_until": services.changes_allowed_until(booking) if can_change else None,
+        "late_fee": services.cancel_fee(booking, services.changes_allowed_until(booking))
+                    if can_change and booking.status == Booking.Status.CONFIRMED else None,
+    }
 
 
 LINKABLE_STATUSES = [Booking.Status.REQUESTED, Booking.Status.TIMES_PROPOSED,

@@ -116,10 +116,20 @@ def place_hold(booking, items, now=None, quote=None):
     and can't both take the last totes.
     """
     now = now or timezone.now()
+    booking.save()  # computes pickup_date from dropoff_date and weeks
+    _check_stock(booking, items, now)
+    _write_lines(booking, items, quote)
+    booking.status = Booking.Status.REQUESTED
+    booking.hold_expires_at = now + timedelta(hours=BusinessSettings.load().hold_hours)
+    booking.save()
+    return booking
+
+
+def _check_stock(booking, items, now):
+    """Lock the products and check each stock-tracked one is free for the
+    booking's dates (not counting the booking itself). Raises NotEnoughStock."""
     product_ids = sorted(p.pk for p, _ in items)
     list(Product.objects.select_for_update().filter(pk__in=product_ids).order_by("pk"))
-
-    booking.save()  # computes pickup_date from dropoff_date and weeks
     for product, qty in items:
         if not product.track_stock:
             continue
@@ -129,10 +139,11 @@ def place_hold(booking, items, now=None, quote=None):
         if qty > free:
             raise NotEnoughStock(product, qty, free)
 
+
+def _write_lines(booking, items, quote):
     booking.lines.all().delete()
     for product, qty in items:
         BookingLine.objects.create(booking=booking, product=product, quantity=qty)
-
     if quote is not None:
         booking.price_lines.all().delete()
         for i, line in enumerate(quote.lines):
@@ -141,11 +152,6 @@ def place_hold(booking, items, now=None, quote=None):
                                      amount=line.amount, sort=i)
         booking.renewal_week_price = quote.renewal_week_price
         booking.delivery_fee = quote.delivery_total
-
-    booking.status = Booking.Status.REQUESTED
-    booking.hold_expires_at = now + timedelta(hours=BusinessSettings.load().hold_hours)
-    booking.save()
-    return booking
 
 
 def expire_holds(now=None):
@@ -429,6 +435,121 @@ def cancel_booking(booking, by_owner=False, now=None):
 # ---------------------------------------------------------------------------
 # Renter changes
 # ---------------------------------------------------------------------------
+
+CHANGEABLE_STATUSES = [Booking.Status.REQUESTED, Booking.Status.CONFIRMED]
+
+
+class CannotChange(Exception):
+    pass
+
+
+def order_from_booking(booking):
+    """The renter's choices behind a booking (package, weeks, extra totes, extras),
+    worked out from its lines: whatever the package doesn't include is an extra."""
+    package = booking.package
+    if package is None:
+        raise CannotChange("This booking was set up by hand. Please contact us to change it.")
+    included = {package.tote_product: package.totes}
+    for item in package.items.select_related("product"):
+        included[item.product] = included.get(item.product, 0) + item.quantity
+    addon, extras = 0, {}
+    for line in booking.lines.select_related("product"):
+        more = line.quantity - included.get(line.product, 0)
+        if more <= 0:
+            continue
+        if line.product == package.tote_product:
+            addon = more
+        else:
+            extras[line.product] = more
+    return Order(package=package, weeks=booking.weeks, addon_totes=addon, extras=extras)
+
+
+def changes_allowed_until(booking):
+    return free_cancel_until(booking)
+
+
+def _move_visit(booking, kind, day, now):
+    """Point the booking's dropoff or pickup visit at the open window on ``day``."""
+    from . import windows
+    from .models import TimeWindow, Visit
+
+    visit = booking.visits.filter(kind=kind).first()
+    current = visit and (visit.window or visit.requested_window)
+    if current and current.date == day:
+        return
+    window = next(iter(windows.open_windows(day, now)), None)
+    if window is None:
+        raise WindowFull(f"We're not delivering on {day:%A, %B %-d}, or it's full. Please pick another date.")
+    window = TimeWindow.objects.select_for_update().get(pk=window.pk)
+    if windows.stops_left(window, now) < 1:
+        raise WindowFull(f"We just filled up for {day:%A, %B %-d}. Please pick another date.")
+    if visit is None:
+        visit = Visit(booking=booking, kind=kind)
+    visit.requested_window = window
+    if booking.status in Booking.COMMITTED_STATUSES:
+        visit.window, visit.status = window, Visit.Status.CONFIRMED
+    visit.save()
+
+
+@transaction.atomic
+def change_booking(booking, order, dropoff_date, now=None):
+    """Change package, length, extras or dropoff date before the cutoff.
+
+    Re-prices with today's prices and the booking's distances, and re-checks
+    stock and delivery days, all in one transaction. Raises CannotChange,
+    NotEnoughStock, WindowFull or a pricing error; nothing is saved then.
+    """
+    now = now or timezone.now()
+    booking = Booking.objects.select_for_update().get(pk=booking.pk)
+    if booking.status not in CHANGEABLE_STATUSES:
+        raise CannotChange("This booking can't be changed online anymore. Please contact us.")
+    if now >= changes_allowed_until(booking):
+        hours = BusinessSettings.load().cancel_cutoff_hours
+        raise CannotChange(f"Changes close {hours} hours before dropoff. Please contact us.")
+    the_quote = quote(order, booking.dropoff_miles, booking.pickup_miles)
+    booking.package = order.package
+    booking.weeks = order.weeks
+    booking.dropoff_date = dropoff_date
+    booking.save()  # new pickup date
+    _check_stock(booking, order.items(), now)
+    _move_visit(booking, "dropoff", booking.dropoff_date, now)
+    _move_visit(booking, "pickup", booking.pickup_date, now)
+    _write_lines(booking, order.items(), the_quote)
+    booking.save()
+    return booking
+
+
+class CannotExtend(Exception):
+    pass
+
+
+@transaction.atomic
+def add_week(booking, now=None):
+    """Keep the totes one more week (after dropoff). Charges the locked weekly
+    renewal price to the saved card; nothing changes if that fails."""
+    from . import payments
+    from .models import Charge
+
+    now = now or timezone.now()
+    booking = Booking.objects.select_for_update().get(pk=booking.pk)
+    if booking.status != Booking.Status.OUT:
+        raise CannotExtend("You can add weeks once your totes are delivered. Before that, change your booking.")
+    if timezone.localdate(now) >= booking.pickup_date:
+        raise CannotExtend("It's pickup day, so it's too late to add a week online. Please contact us.")
+    booking.renewals += 1
+    booking.save()  # pickup moves a week later
+    items = [(l.product, l.quantity) for l in booking.lines.select_related("product")]
+    _check_stock(booking, items, now)
+    _move_visit(booking, "pickup", booking.pickup_date, now)
+    charge = None
+    if payments.enabled() and booking.renewal_week_price:
+        charge = payments.charge(booking, Charge.Kind.RENEWAL, booking.renewal_week_price,
+                                 f"Extra week for {booking.reference}")
+        if charge is None or charge.status != Charge.Status.CAPTURED:
+            reason = (charge.failure_message if charge else "") or "the card was declined"
+            transaction.set_rollback(True)
+            raise CannotExtend(f"We couldn't charge your card ({reason}). Update your card and try again.")
+    return booking, charge
 
 EDITABLE_STATUSES = [Booking.Status.REQUESTED, Booking.Status.TIMES_PROPOSED, Booking.Status.CONFIRMED]
 
