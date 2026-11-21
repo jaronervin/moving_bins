@@ -537,6 +537,7 @@ def add_week(booking, now=None):
     if timezone.localdate(now) >= booking.pickup_date:
         raise CannotExtend("It's pickup day, so it's too late to add a week online. Please contact us.")
     booking.renewals += 1
+    booking.pickup_reminded_at = None  # remind again before the new pickup day
     booking.save()  # pickup moves a week later
     items = [(l.product, l.quantity) for l in booking.lines.select_related("product")]
     _check_stock(booking, items, now)

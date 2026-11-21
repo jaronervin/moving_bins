@@ -1,0 +1,14 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Your Sprout Tote Co. totes are coming {{ booking.dropoff_date|date:"l, F j" }}{% if window %}, by {{ window.end|time:"g:i A" }}{% endif %}.
+
+  Dropoff: {{ booking.dropoff_address }}
+  {% if booking.presence == "present" %}You'll be there{% if booking.time_request %} ({{ booking.time_request }}){% endif %}.{% else %}We'll leave them at your door or porch.{% endif %}
+{% if not booking.pickup_address %}
+We still need your moving-in address (where we pick the totes up).
+Please add it before dropoff: {{ link }}
+{% endif %}
+Pickup is {{ booking.pickup_date|date:"l, F j" }} at {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}your new address{% endif %}.
+
+Your booking: {{ link }}
+Need to change something? {{ contact_email }} · {{ contact_phone }}{% endautoescape %}

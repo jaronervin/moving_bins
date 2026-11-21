@@ -120,6 +120,12 @@ class BusinessSettings(models.Model):
     late_cancel_charge_percent = models.PositiveIntegerField(
         default=50, help_text="Percent of the rental charged for a late cancellation."
     )
+    dropoff_reminder_days = models.PositiveIntegerField(
+        default=3, help_text="Email renters this many days before dropoff (0 = don't)."
+    )
+    pickup_reminder_days = models.PositiveIntegerField(
+        default=2, help_text="Email renters this many days before pickup (0 = don't)."
+    )
     authorize_hours_before_dropoff = models.PositiveIntegerField(
         default=24,
         help_text="Place a pending hold on the card this long before dropoff. 0 = don't.",
@@ -547,6 +553,8 @@ class Booking(models.Model):
     decline_reason = models.CharField(max_length=500, blank=True)
     stripe_payment_method_id = models.CharField(max_length=64, blank=True)
     stripe_checkout_session_id = models.CharField(max_length=128, blank=True)
+    dropoff_reminded_at = models.DateTimeField(null=True, blank=True)
+    pickup_reminded_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

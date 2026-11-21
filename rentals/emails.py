@@ -94,6 +94,34 @@ def booking_extended(booking, charge=None):
                 f"Pickup is now {booking.pickup_date:%a %b %-d}.")
 
 
+def _visit_window(booking, kind):
+    visit = booking.visits.filter(kind=kind).select_related("window", "requested_window").first()
+    return visit and (visit.window or visit.requested_window)
+
+
+def dropoff_reminder(booking):
+    s = BusinessSettings.load()
+    _send([booking.customer.email], "rentals/email/dropoff_reminder_subject.txt",
+          "rentals/email/dropoff_reminder_body.txt",
+          {"booking": booking, "window": _visit_window(booking, "dropoff"),
+           "link": booking_url(booking, absolute=True), "contact_email": s.contact_email,
+           "contact_phone": s.contact_phone})
+
+
+def pickup_reminder(booking):
+    from django.urls import reverse
+
+    from .links import make_token
+
+    s = BusinessSettings.load()
+    _send([booking.customer.email], "rentals/email/pickup_reminder_subject.txt",
+          "rentals/email/pickup_reminder_body.txt",
+          {"booking": booking, "window": _visit_window(booking, "pickup"),
+           "link": booking_url(booking, absolute=True),
+           "add_week_link": settings.SITE_URL + reverse("renter_add_week", args=[make_token(booking)]),
+           "contact_email": s.contact_email, "contact_phone": s.contact_phone})
+
+
 def change_requested(booking):
     """To the renter when the owners ask for a change during the review window."""
     _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",

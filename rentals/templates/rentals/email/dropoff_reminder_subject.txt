@@ -1,0 +1,1 @@
+{% autoescape off %}Your totes arrive {{ booking.dropoff_date|date:"l, M j" }}{% endautoescape %}

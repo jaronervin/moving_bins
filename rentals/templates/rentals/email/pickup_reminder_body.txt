@@ -1,0 +1,14 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+We're picking up your totes {{ booking.pickup_date|date:"l, F j" }}{% if booking.pickup_address %} at {{ booking.pickup_address }}{% endif %}.
+
+Please have them ready{% if window %} by {{ window.start|time:"g:i A" }}{% endif %}:
+  - totes empty, lids on, stacked near the door
+  - dollies and any rented equipment with them
+
+Not unpacked yet? Keep them another week for ${{ booking.renewal_week_price }}:
+{{ add_week_link }}
+(If they aren't ready when we arrive, the rental extends a week at that price.)
+
+Your booking: {{ link }}
+Questions? {{ contact_email }} · {{ contact_phone }}{% endautoescape %}

@@ -181,3 +181,31 @@ class AddWeekTests(FlowTestCase):
             self.client.post(f"/b/{self.token}/add-week/")
         self.assertEqual(charge.call_args.args[1:3], (Charge.Kind.RENEWAL, D("65.00")))
         self.assertIn("We charged $65.00", mail.outbox[0].body)
+
+
+class ReminderTests(FlowTestCase):
+    def test_dropoff_and_pickup_reminders_once(self):
+        from rentals.reminders import send_reminders
+        self.walk(pickup_unknown=True)
+        booking = Booking.objects.get()
+        mail.outbox.clear()
+        now = timezone.now()
+        self.assertEqual(send_reminders(now), (0, 0))  # dropoff is 10 days out
+        three_before = now + timedelta(days=(self.dropoff - timezone.localdate(now)).days - 3)
+        self.assertEqual(send_reminders(three_before), (1, 0))
+        body = mail.outbox[0].body
+        self.assertIn("by 1:00 PM", body)
+        self.assertIn("We still need your moving-in address", body)
+        self.assertEqual(send_reminders(three_before), (0, 0))  # only once
+
+        Booking.objects.filter(pk=booking.pk).update(status=Booking.Status.OUT)
+        two_before = now + timedelta(days=(self.pickup - timezone.localdate(now)).days - 2)
+        self.assertEqual(send_reminders(two_before), (0, 1))
+        self.assertIn("ready by 9:00 AM", mail.outbox[-1].body)
+        self.assertIn("/add-week/", mail.outbox[-1].body)
+
+        # adding a week re-arms the pickup reminder
+        TimeWindow.objects.create(date=self.pickup + timedelta(days=7), start=time(9), end=time(13))
+        with mock.patch.object(services.timezone, "now", return_value=two_before):
+            services.add_week(booking)
+        self.assertEqual(send_reminders(two_before + timedelta(days=7)), (0, 1))

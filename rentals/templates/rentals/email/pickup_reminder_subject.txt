@@ -1,0 +1,1 @@
+{% autoescape off %}Tote pickup {{ booking.pickup_date|date:"l, M j" }}{% endautoescape %}
