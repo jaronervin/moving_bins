@@ -98,3 +98,12 @@ class OtherRuleTests(SimpleTestCase):
         self.assertEqual(pricing.business_days_before(monday, 3), date(2027, 1, 6))  # Wednesday
         friday = date(2027, 1, 15)
         self.assertEqual(pricing.business_days_before(friday, 3), date(2027, 1, 12))
+
+
+class OutOfRangeMessageTests(SimpleTestCase):
+    def test_just_over_the_limit_shows_a_decimal(self):
+
+        with self.assertRaisesMessage(pricing.OutOfRange, "about 35.4 miles away in a straight line"):
+            pricing.zone_fee(35.4, 20, 35, 25)
+        with self.assertRaisesMessage(pricing.OutOfRange, "about 48 miles away"):
+            pricing.zone_fee(48.2, 20, 35, 25)

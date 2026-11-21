@@ -59,7 +59,10 @@ def zone_fee(miles, free_radius, max_radius, fee, what="That address"):
     the outer zone, refused beyond ``max_radius``."""
     miles = float(miles)
     if miles > max_radius:
-        raise OutOfRange(f"{what} is about {miles:.0f} miles away; we serve within {max_radius} miles.")
+        # One decimal near the limit, so 35.4 doesn't read as "35 miles" and look allowed.
+        shown = f"{miles:.1f}" if round(miles) <= max_radius else f"{miles:.0f}"
+        raise OutOfRange(f"{what} is about {shown} miles away in a straight line; "
+                         f"we serve within {max_radius} miles.")
     return ZERO if miles <= free_radius else to_cents(fee)
 
 
