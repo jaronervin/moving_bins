@@ -144,6 +144,9 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Rental agreement:** lawyer review of `rentals/agreements/2026-11-draft.md` (open questions are in the
       Claude Doc); publish the reviewed text as a new version.
 - [ ] **Hosting:** set `TRUST_X_FORWARDED_FOR=1` so signatures record the renter's real IP address.
+- [ ] **Stripe payment methods (live mode):** Settings › Payment methods: turn off Link, Amazon Pay and Affirm
+      (they hide card details, so signatures lose the card brand, last 4 and bank address checks). Keep cards,
+      Apple Pay, Google Pay. Already done in test mode.
 - [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
 
 ## Progress
