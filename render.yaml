@@ -35,7 +35,9 @@ services:
         value: "Test site: bookings here aren't real. Use Stripe test card 4242 4242 4242 4242."
       - key: MAPS_BACKEND
         value: auto       # real Google lookups once GOOGLE_MAPS_API_KEY (server key) is set in Render
-      # Server key GOOGLE_MAPS_API_KEY is added in Render's dashboard (secret).
+      # Google server key (Geocoding API only): typed into Render, never stored here.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       - key: GOOGLE_MAPS_BROWSER_KEY
         value: AIzaSyB82Fa5IGtJnh-shhZgHedCZmY-MTeVC7g   # public; Google limits it to our web addresses
       # Stripe test mode
