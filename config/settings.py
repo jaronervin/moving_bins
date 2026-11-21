@@ -123,8 +123,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Maps: "google" in production (needs GOOGLE_MAPS_API_KEY); "fake" locally,
 # which estimates distances from a small table of ZIP codes (see rentals/maps.py).
-MAPS_BACKEND = os.environ.get("MAPS_BACKEND", "fake" if DEBUG else "google")
+# "auto" = google once GOOGLE_MAPS_API_KEY is set, fake until then (the test site).
 GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")  # server key: Geocoding API
+MAPS_BACKEND = os.environ.get("MAPS_BACKEND", "fake" if DEBUG else "google")
+if MAPS_BACKEND == "auto":
+    MAPS_BACKEND = "google" if GOOGLE_MAPS_API_KEY else "fake"
 # Browser key for address suggestions (Maps JavaScript API + Places API (New)).
 # It's public (it's in the page); Google restricts it to our web addresses.
 GOOGLE_MAPS_BROWSER_KEY = os.environ.get("GOOGLE_MAPS_BROWSER_KEY", "")
