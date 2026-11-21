@@ -325,3 +325,14 @@ class AddressSuggestionTests(FlowTestCase):
         self.assertContains(page, 'data-key="browser-key"')
         self.assertContains(page, "rentals/address.js")
         self.assertIn("places.googleapis.com", page["Content-Security-Policy"])
+
+
+class SystemStatusTests(TestCase):
+    @override_settings(MAPS_BACKEND="fake", GOOGLE_MAPS_BROWSER_KEY="", STRIPE_SECRET_KEY="sk_test_abc")
+    def test_shows_what_is_on_without_keys(self):
+        User.objects.create_user("owner", password="x", is_staff=True)
+        self.client.login(username="owner", password="x")
+        page = self.client.get("/ops/")
+        self.assertContains(page, "Estimated from ZIP codes")
+        self.assertContains(page, "Stripe, test mode")
+        self.assertNotContains(page, "sk_test_abc")

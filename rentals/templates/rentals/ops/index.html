@@ -81,5 +81,13 @@
       </table>
     {% endfor %}
   </section>
+  <section class="card">
+    <h2>System</h2>
+    <table>
+      {% for name, ok, detail in system %}
+        <tr><td>{{ name }}</td><td>{% if ok %}✓{% else %}<span class="error">✗</span>{% endif %} {{ detail }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
 </div>
 {% endblock %}

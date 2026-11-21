@@ -35,6 +35,26 @@ staff_required = user_passes_test(lambda u: u.is_active and u.is_staff)
 MODES = {"load": "Load for dropoff", "pickup": "Pickup"}
 
 
+def _system_status():
+    """Which outside services are really switched on. Never shows a key."""
+    from django.conf import settings as s
+
+    stripe_key = s.STRIPE_SECRET_KEY or ""
+    mode = "live" if stripe_key.startswith(("sk_live", "rk_live")) else "test"
+    smtp = "smtp" in s.EMAIL_BACKEND
+    return [
+        ("Address checks", s.MAPS_BACKEND == "google",
+         "Google" if s.MAPS_BACKEND == "google" else "Estimated from ZIP codes (GOOGLE_MAPS_API_KEY not set)"),
+        ("Address suggestions", bool(s.GOOGLE_MAPS_BROWSER_KEY),
+         "On" if s.GOOGLE_MAPS_BROWSER_KEY else "Off (GOOGLE_MAPS_BROWSER_KEY not set)"),
+        ("Payments", bool(stripe_key), f"Stripe, {mode} mode" if stripe_key else "Off (STRIPE_SECRET_KEY not set)"),
+        ("Stripe webhook", s.STRIPE_WEBHOOK_SECRET.startswith("whsec_"),
+         "Set" if s.STRIPE_WEBHOOK_SECRET.startswith("whsec_") else "Not set"),
+        ("Email", smtp and bool(s.EMAIL_HOST), f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
+         else "Not sent: written to the server log"),
+    ]
+
+
 @staff_required
 def index(request):
     today = timezone.localdate()
@@ -58,6 +78,7 @@ def index(request):
                                                                          Booking.Status.PICKED_UP, Booking.Status.CLOSED])
                              .select_related("booking__customer").order_by("-created_at")[:10]),
         "states": StockState,
+        "system": _system_status(),
         "settings": BusinessSettings.load(),
     })
 
