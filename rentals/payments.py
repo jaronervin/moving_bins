@@ -93,7 +93,7 @@ def ensure_customer(customer):
     return customer.stripe_customer_id
 
 
-def start_card_setup(booking, return_url):
+def start_card_setup(booking, return_url, updating=False):
     """Create an embedded Checkout Session (setup mode) and return its client secret.
 
     ``return_url`` must contain ``{CHECKOUT_SESSION_ID}``.
@@ -112,6 +112,12 @@ def start_card_setup(booking, return_url):
         "metadata": {"booking": booking.reference},
         # Full billing address so the bank checks it (AVS): evidence for the signature.
         "billing_address_collection": "required",
+        # Setup mode's button always says "Save" (Stripe doesn't allow another
+        # label here), so say what it does just above it.
+        "custom_text": {"submit": {"message": (
+            "Saving replaces the card on your booking. Nothing is charged now." if updating else
+            "Saving your card completes your booking. Nothing is charged now; we hold the total "
+            "the day before dropoff and charge it when your totes arrive.")}},
         "integration_identifier": f"sprouttote-card-setup-{_tag()}",
         **_payment_method_configuration(),
     })

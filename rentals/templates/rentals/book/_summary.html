@@ -1,5 +1,5 @@
 {% if quote %}
-<section class="card summary">
+<section class="card summary{% if static_summary %} static{% endif %}">
   <h2>Your order</h2>
   <table>
     {% for line in quote.lines %}

@@ -143,7 +143,7 @@ class ContactForm(Form):
                            widget=forms.TextInput(attrs={"autocomplete": "name"}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={"autocomplete": "email"}))
     phone = forms.CharField(max_length=30, help_text="For day-of coordination only.",
-                            widget=forms.TextInput(attrs={"autocomplete": "tel", "inputmode": "tel"}))
+                            widget=forms.TextInput(attrs={"type": "tel", "autocomplete": "tel", "data-phone": ""}))
     access_notes = forms.CharField(
         label="Anything we should know?", required=False, max_length=1000,
         widget=forms.Textarea(attrs={"rows": 3}),

@@ -55,7 +55,7 @@ def card_session(request, token):
         return JsonResponse({"error": "This booking can't take a card right now."}, status=400)
     done = request.build_absolute_uri(reverse("card_done", args=[token])) + "?session_id={CHECKOUT_SESSION_ID}"
     try:
-        secret = payments.start_card_setup(booking, done)
+        secret = payments.start_card_setup(booking, done, updating=booking.status != Booking.Status.AWAITING_CARD)
     except stripe.StripeError:
         log.exception("Could not start card setup for %s", booking.reference)
         return JsonResponse({"error": "We couldn't reach our payment provider. Please try again."}, status=502)
