@@ -1,0 +1,16 @@
+<section class="card area-check">
+  <h2>Do we deliver to you?</h2>
+  <form method="post" action="{% url 'check_area' %}" id="area-check">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <label for="area-address" class="sr-only">Address, town or ZIP code</label>
+    <div class="area-row">
+      <input type="text" id="area-address" name="area-line1" data-full-address required minlength="3"
+             placeholder="Street address, town or ZIP" autocomplete="street-address">
+      <button type="submit">Check</button>
+    </div>
+    <p id="area-result" class="area-result" aria-live="polite"></p>
+    <p class="muted fine">Free within {{ settings.free_radius_miles }} miles of Northeast Baltimore,
+      ${{ settings.extended_zone_fee|floatformat:0 }} per address out to {{ settings.max_radius_miles }} miles.
+      Check your moving-in address too.</p>
+  </form>
+</section>

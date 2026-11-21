@@ -57,13 +57,19 @@ class FakeMaps:
         "20001": 36, "21701": 46, "21702": 48, "17401": 42, "21801": 90,
     }
 
-    def geocode(self, address, near=None):
-        if not address.get("line1") or not address.get("zip_code"):
+    def geocode(self, address, near=None, precise=True):
+        import re
+
+        zip_code = address.get("zip_code") or ""
+        if not zip_code:  # one-line address, e.g. from the "do we deliver to you?" box
+            found = re.search(r"\b(\d{5})(?:-\d{4})?\b", address.get("line1", ""))
+            zip_code = found.group(1) if found else ""
+        if not zip_code or (precise and not address.get("line1")):
             raise AddressNotFound("Please enter a street address and ZIP code.")
         lat0, lng0 = near or (39.352, -76.563)
-        miles = self.ZIP_MILES.get(address["zip_code"][:5], 10)
+        miles = self.ZIP_MILES.get(zip_code[:5], 10)
         return Place(formatted=one_line(address), lat=float(lat0) + miles / 69.05, lng=float(lng0),
-                     place_id=f"fake:{address['zip_code']}")
+                     place_id=f"fake:{zip_code}")
 
 
 class GoogleMaps:
@@ -81,7 +87,9 @@ class GoogleMaps:
         except Exception as exc:  # network error, HTTP error, bad JSON
             raise MapsUnavailable("The map service didn't respond. Please try again.") from exc
 
-    def geocode(self, address, near=None):
+    def geocode(self, address, near=None, precise=True):
+        """``precise=False`` also accepts a ZIP code, town or street (for the
+        eligibility check): the distance is then to its center."""
         query = urllib.parse.urlencode(
             {"address": one_line(address), "components": "country:US", "key": self.api_key}
         )
@@ -91,7 +99,7 @@ class GoogleMaps:
         if data.get("status") != "OK":
             raise MapsUnavailable(f"Map lookup failed ({data.get('status')}).")
         best = data["results"][0]
-        if not self.PRECISE_TYPES & set(best.get("types", [])):
+        if precise and not self.PRECISE_TYPES & set(best.get("types", [])):
             raise AddressNotFound("Please enter a full street address, including house number.")
         loc = best["geometry"]["location"]
         return Place(formatted=best["formatted_address"], lat=loc["lat"], lng=loc["lng"],
@@ -109,7 +117,7 @@ def get_maps():
     raise ImproperlyConfigured(f"Unknown MAPS_BACKEND {backend!r}")
 
 
-def lookup(address, base_lat, base_lng):
+def lookup(address, base_lat, base_lng, precise=True):
     """Confirm ``address`` and measure straight-line miles from base.
 
     Returns (Place, miles). Cached for a day so re-submitting a form doesn't
@@ -117,12 +125,12 @@ def lookup(address, base_lat, base_lng):
     """
     from .pricing import straight_line_miles
 
-    raw = json.dumps([one_line(address).lower(), str(base_lat), str(base_lng), settings.MAPS_BACKEND])
+    raw = json.dumps([one_line(address).lower(), str(base_lat), str(base_lng), settings.MAPS_BACKEND, precise])
     key = "maps:" + hashlib.sha256(raw.encode()).hexdigest()
     hit = cache.get(key)
     if hit:
         return Place(**hit[0]), hit[1]
-    place = get_maps().geocode(address, near=(base_lat, base_lng))
+    place = get_maps().geocode(address, near=(base_lat, base_lng), precise=precise)
     miles = straight_line_miles(base_lat, base_lng, place.lat, place.lng)
     cache.set(key, (place.__dict__, miles), 60 * 60 * 24)
     return place, miles

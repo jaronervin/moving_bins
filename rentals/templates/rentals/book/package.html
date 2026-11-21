@@ -2,6 +2,7 @@
 {% block title %}Book totes · Sprout Tote Co.{% endblock %}
 {% block content %}
 {% include "rentals/book/_steps.html" %}
+{% include "rentals/_area_check.html" %}
 <form method="post">{% csrf_token %}
   {{ form.non_field_errors }}
   <h2>Choose a package</h2>
@@ -43,4 +44,5 @@
     </section>
   </div>
 </form>
+{% include "rentals/_places.html" %}
 {% endblock %}

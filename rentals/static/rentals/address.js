@@ -30,6 +30,7 @@
 
   function enhance(input) {
     var prefix = input.name.replace(/-line1$/, "");
+    if (input.hasAttribute("data-full-address")) input.removeAttribute("autocomplete");
     input.setAttribute("autocomplete", "off");  // one dropdown, not two
     input.setAttribute("role", "combobox");
     input.setAttribute("aria-autocomplete", "list");
@@ -104,6 +105,12 @@
       var item = items[i];
       if (!item) return;
       close();
+      if (input.hasAttribute("data-full-address")) {  // one box: keep the whole address
+        input.value = item.placePrediction.text.toString();
+        token = null;
+        if (input.form) input.form.requestSubmit();
+        return;
+      }
       var place = item.placePrediction.toPlace();
       place.fetchFields({fields: ["addressComponents"]}).then(function () {
         token = null;  // a new session for the next search

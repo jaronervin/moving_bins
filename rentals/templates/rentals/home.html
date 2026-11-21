@@ -8,6 +8,8 @@
   recycled, instead of a pile of cardboard after one.
 </p>
 
+{% include "rentals/_area_check.html" %}
+
 <div class="packages">
   {% for p in packages %}
   <a class="package" href="{% url 'book_package' %}?package={{ p.pk }}">
@@ -46,4 +48,5 @@
   <div class="card stat"><b>{{ impact.boxes_avoided|intcomma }}</b><span class="muted">cardboard boxes avoided</span></div>
   <div class="card stat"><b>{{ impact.bins_recycled|intcomma }}</b><span class="muted">worn-out totes recycled</span></div>
 </div>
+{% include "rentals/_places.html" %}
 {% endblock %}

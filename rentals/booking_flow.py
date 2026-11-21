@@ -13,6 +13,7 @@ Answers are kept in the visitor's session (stored server-side, so they can't
 be tampered with) under the key "draft" until the booking is submitted.
 """
 
+import re
 from datetime import date, timedelta
 
 from django.contrib import messages
@@ -187,7 +188,7 @@ def addresses(request):
             except maps.MapsUnavailable as exc:
                 messages.error(request, str(exc))
     else:
-        dropoff_form = AddressForm(prefix="dropoff", initial=draft.get("dropoff"))
+        dropoff_form = AddressForm(prefix="dropoff", initial=draft.get("dropoff") or request.session.get("area_check"))
         pickup_initial = draft.get("pickup") or ({"unknown": True} if "dropoff" in draft else None)
         pickup_form = PickupAddressForm(prefix="pickup", initial=pickup_initial)
 
@@ -278,6 +279,71 @@ def _submit(request, draft, version, sign_form):
     else:
         messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
     return redirect(booking_url(booking))
+
+
+# ---------------------------------------------------------------------------
+# "Do we deliver to you?" (first page and home page)
+# ---------------------------------------------------------------------------
+
+AREA_CHECKS_PER_VISIT = 15  # each check is a paid Google lookup
+
+
+def _split_formatted(formatted):
+    """'100 Light St, Baltimore, MD 21202, USA' → address fields (best effort, for prefilling)."""
+    parts = [p.strip() for p in formatted.split(",")]
+    if parts and parts[-1] in ("USA", "United States"):
+        parts = parts[:-1]
+    found = re.match(r"([A-Z]{2})\s+(\d{5})", parts[-1]) if len(parts) >= 3 else None
+    if not found:
+        return None
+    return {"line1": parts[0], "line2": "", "city": parts[-2], "state": found.group(1),
+            "zip_code": found.group(2)}
+
+
+def check_area(request):
+    """Answer "do you deliver here, and is there a fee?" for one address, before booking."""
+    from django.http import JsonResponse
+
+    s = BusinessSettings.load()
+    text = (request.POST.get("area-line1") or "").strip()[:200]
+    status, message = "error", ""
+    checks = request.session.get("area_checks", 0)
+    if request.method != "POST":
+        return redirect("book_package")
+    if checks >= AREA_CHECKS_PER_VISIT:
+        message = f"That's a lot of checks! Email us at {s.contact_email} and we'll tell you."
+    elif len(text) < 3:
+        message = "Type a street address, town or ZIP code."
+    else:
+        request.session["area_checks"] = checks + 1
+        try:
+            place, miles = maps.lookup({"line1": text}, s.base_lat, s.base_lng, precise=False)
+            fee = pricing.zone_fee(miles, s.free_radius_miles, s.max_radius_miles, s.extended_zone_fee,
+                                   what="That address")
+        except maps.AddressNotFound:
+            message = "We couldn't find that. Try a street address, town or ZIP code."
+        except maps.MapsUnavailable:
+            message = "We couldn't check that right now. Please try again in a minute."
+        except pricing.OutOfRange as exc:
+            status = "out"
+            message = (f"Sorry, we don't deliver there yet. {exc} If you're just outside, email "
+                       f"{s.contact_email}; we may be able to help.")
+        else:
+            where = place.formatted.replace(", USA", "")
+            if fee:
+                status = "fee"
+                message = (f"We deliver to {where}. It's about {miles:.0f} miles from us, so it adds "
+                           f"${fee:.0f} for each address beyond {s.free_radius_miles} miles.")
+            else:
+                status = "free"
+                message = f"Good news: we deliver free to {where} (about {miles:.0f} miles from us)."
+            fields = _split_formatted(place.formatted)
+            if fields:
+                request.session["area_check"] = fields
+    if request.headers.get("x-requested-with") == "fetch":
+        return JsonResponse({"status": status, "message": message})
+    (messages.success if status in ("free", "fee") else messages.error)(request, message)
+    return redirect(request.POST.get("next") or "book_package")
 
 
 def start_over(request):

@@ -6,6 +6,7 @@ Free within 20 miles, $25 per address from 20 to 35 miles, refused beyond.
 """
 
 import re
+import unittest.mock
 from datetime import time, timedelta
 from decimal import Decimal as D
 
@@ -336,3 +337,42 @@ class SystemStatusTests(TestCase):
         self.assertContains(page, "Estimated from ZIP codes")
         self.assertContains(page, "Stripe, test mode")
         self.assertNotContains(page, "sk_test_abc")
+
+
+@override_settings(MAPS_BACKEND="fake")
+class AreaCheckTests(TestCase):
+    def check(self, text):
+        return self.client.post("/check-area/", {"area-line1": text}, HTTP_X_REQUESTED_WITH="fetch").json()
+
+    def test_free_fee_and_out_of_range(self):
+        self.assertEqual(self.check("100 Light St, Baltimore, MD 21218")["status"], "free")
+        r = self.check("Annapolis 21401")
+        self.assertEqual(r["status"], "fee")
+        self.assertIn("adds $25", r["message"])
+        r = self.check("Frederick 21702")
+        self.assertEqual(r["status"], "out")
+        self.assertIn("about 48 miles", r["message"])
+        self.assertEqual(self.check("x")["status"], "error")
+
+    def test_checked_address_prefills_the_addresses_step(self):
+        from rentals import maps
+        place = maps.Place(formatted="100 Light St, Baltimore, MD 21202, USA", lat=39.3, lng=-76.6, place_id="p")
+        with self.settings(MAPS_BACKEND="fake"), \
+                unittest.mock.patch.object(maps, "lookup", return_value=(place, 6.0)):
+            self.assertEqual(self.check("100 Light St")["status"], "free")
+        self.assertEqual(self.client.session["area_check"],
+                         {"line1": "100 Light St", "line2": "", "city": "Baltimore", "state": "MD", "zip_code": "21202"})
+
+    def test_limit_per_visit(self):
+        for _ in range(15):
+            self.check("Annapolis 21401")
+        self.assertIn("lot of checks", self.check("Annapolis 21401")["message"])
+
+    def test_works_without_javascript(self):
+        r = self.client.post("/check-area/", {"area-line1": "Frederick 21702", "next": "/"}, follow=True)
+        self.assertContains(r, "we don&#x27;t deliver there yet")
+
+    def test_shown_on_home_and_first_step(self):
+        inventory.record_purchase(bins(), 1)
+        self.assertContains(self.client.get("/"), "Do we deliver to you?")
+        self.assertContains(self.client.get("/book/"), "Do we deliver to you?")

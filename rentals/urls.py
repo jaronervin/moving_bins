@@ -11,6 +11,7 @@ urlpatterns = [
     path("book/contact/", booking_flow.contact, name="book_contact"),
     path("book/review/", booking_flow.review, name="book_review"),
     path("book/start-over/", booking_flow.start_over, name="book_start_over"),
+    path("check-area/", booking_flow.check_area, name="check_area"),
     path("b/<str:token>/", views.booking_detail, name="booking_detail"),
     path("b/<str:token>/card/", payment_views.card, name="card"),
     path("b/<str:token>/card/session", payment_views.card_session, name="card_session"),

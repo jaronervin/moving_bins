@@ -47,6 +47,27 @@
     if (formatted) el.value = formatted;
   });
 
+  // "Do we deliver to you?": ask the server and show the answer in place.
+  var area = document.getElementById("area-check");
+  if (area && window.fetch) {
+    area.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var out = document.getElementById("area-result"), button = area.querySelector("button");
+      out.className = "area-result";
+      out.textContent = "Checking…";
+      button.disabled = true;
+      fetch(area.action, {method: "POST", body: new FormData(area), credentials: "same-origin",
+                          headers: {"X-Requested-With": "fetch"}})
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          out.textContent = data.message;
+          out.className = "area-result " + data.status;
+        })
+        .catch(function () { out.textContent = "We couldn't check that right now. Please try again."; })
+        .then(function () { button.disabled = false; });
+    });
+  }
+
   var input = document.getElementById("tote-search");
   if (input) {
     var items = document.querySelectorAll("#tote-list li");
