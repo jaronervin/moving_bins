@@ -513,3 +513,6 @@ to add later.
    door jamb protectors, …) and its price.
 2. Fee for the 20–35 mile zone ($25 for now).
 3. City list for the service area: replace or supplement the radius?
+4. Straight-line vs driving miles for the 20/35-mile zones (parked). Straight-line
+   now; driving miles would add a Google route lookup per address (also inside the
+   free monthly allowance) and about an hour of work.
