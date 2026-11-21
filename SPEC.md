@@ -173,6 +173,27 @@ Emailed links carry a signed, expiring token tied to the booking — no
 accounts. A "resend my link" form takes an email address and re-sends links
 for that address's bookings.
 
+### 3.4 What renters can do from their link (built)
+- **Cancel** (confirm page first): free until `cancel_cutoff_hours` (72) before
+  the dropoff window opens; after that `late_cancel_charge_percent` (50%) of the
+  rental, taken from the card hold if there is one. Totes, delivery stops and any
+  hold are released. Owners cancelling (admin bulk action) never charge a fee.
+- **Change** package, length, dropoff date or extras until the same cutoff. The
+  new price is shown first; on confirm, stock and delivery days are re-checked
+  in one transaction and the visits move. Addresses: by email for now.
+- **Keep them another week** once the totes are delivered (until pickup day):
+  charges the locked weekly renewal price to the saved card and moves pickup a
+  week; nothing changes if the card fails.
+- Each sends the renter an email and the owners an alert.
+- **Reminders** (daily job): `dropoff_reminder_days` (3) before dropoff, with a
+  nudge if the moving-in address is missing; `pickup_reminder_days` (2) before
+  pickup, with the add-a-week link.
+
+### 3.5 "Do we deliver to you?" (built)
+On the home page and booking step 1: one box (street, town or ZIP, with Google
+suggestions) answers free / fee / out of range in place. A checked street
+address prefills the Addresses step. 15 checks per visit (each is a lookup).
+
 ---
 
 ## 4. Inventory & availability

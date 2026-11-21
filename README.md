@@ -118,7 +118,10 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 | `rentals/windows.py` | Weekly window pattern → dated delivery windows; open windows with room |
 | `rentals/bins.py` | Tracked totes: codes, loading, pickup, check-in, missing, spare lids |
 | `rentals/totes.py` | Renter tote pages: scan a QR to note contents, search their totes |
-| `rentals/ops.py` | Owner tools: camera scanner pages, bin history, printable QR labels |
+| `rentals/ops.py` | Owner tools: today page (with System status), route view, scanner pages, bin history, labels |
+| `rentals/routes.py` | A day's stops in driving order and Google Maps route links |
+| `rentals/renter_views.py` | Renter cancel / change / add-a-week pages |
+| `rentals/reminders.py` | Reminder emails before dropoff and pickup (daily job) |
 | `rentals/payments.py` | Everything that talks to Stripe: save card, holds, captures, charges, webhooks |
 | `rentals/payment_views.py` | Card page, return from Stripe, webhook endpoint |
 | `rentals/middleware.py` | Content-Security-Policy header |
@@ -164,6 +167,7 @@ All in the admin (Business settings, Products, Packages):
 - [x] 4. Stripe: card saved at booking, hold before dropoff, charge at dropoff, late-cancel/damage/renewal
       charges, webhooks (tax not yet switched on)
 - [x] 5. Agreement signed online at Review; card name check; signed PDF emailed and on the booking page
-- [ ] 6. Owner tools: inbox, schedule, route, at-the-door, check-in
-- [ ] 7. Change/cancel, renewals, damage charges, reminders
+- [ ] 6. Owner tools: review inbox, route view (/ops/day/), check-in done; at-the-door photos and
+      "mark dropped off / picked up" from the route view still to do
+- [x] 7. Renter change/cancel/add-a-week, reminders, admin bulk cancel (damage charges are in check-in)
 - [ ] 8. Deploy
