@@ -168,6 +168,20 @@ class BookingAdmin(admin.ModelAdmin):
     inlines = [PriceLineInline, BookingLineInline, VisitInline, ChargeInline, CheckInInline]
     actions = ["cancel_selected"]
 
+    def has_delete_permission(self, request, obj=None):
+        # Bookings are never deleted: they hold the signed agreement and payment
+        # records. Cancel instead (action menu, or the renter's own link).
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.contrib import messages as m
+
+        if request.method == "GET" and not request.GET:
+            m.info(request, "To get rid of a booking, tick it and choose \"Cancel selected bookings\" from the "
+                            "action menu. Bookings are kept (not deleted) because they hold the signed agreement "
+                            "and payment records.")
+        return super().changelist_view(request, extra_context)
+
     @admin.action(description="Cancel selected bookings (no fee, no email: for test or duplicate bookings)")
     def cancel_selected(self, request, queryset):
         from . import services
@@ -242,6 +256,9 @@ class ChargeAdmin(admin.ModelAdmin):
     list_display = ["booking", "kind", "status", "amount", "tax", "created_at"]
     list_filter = ["kind", "status"]
 
+    def has_delete_permission(self, request, obj=None):
+        return False  # payment records are kept; refunds happen in Stripe
+
 
 @admin.register(AgreementVersion)
 class AgreementVersionAdmin(admin.ModelAdmin):
@@ -264,6 +281,9 @@ class SignatureAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # signed agreements are kept: they're the evidence in a dispute
 
 
 @admin.register(CheckIn)

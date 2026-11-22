@@ -407,3 +407,16 @@ class AdminCancelTests(FlowTestCase):
         self.assertEqual(booking.status, "cancelled")
         self.assertEqual(inventory.available(bins(), self.dropoff, self.pickup), 60)
         self.assertTrue(all(v.status == "cancelled" for v in booking.visits.all()))
+
+
+class NoDeletingRecordsTests(FlowTestCase):
+    def test_admin_offers_cancel_not_delete(self):
+        self.walk()
+        User.objects.create_superuser("boss", "b@example.com", "x")
+        self.client.login(username="boss", password="x")
+        page = self.client.get("/admin/rentals/booking/")
+        self.assertContains(page, "Cancel selected bookings")
+        self.assertNotContains(page, "Delete selected")
+        self.assertContains(page, "Bookings are kept (not deleted)")
+        b = Booking.objects.get()
+        self.assertEqual(self.client.get(f"/admin/rentals/booking/{b.pk}/delete/").status_code, 403)
