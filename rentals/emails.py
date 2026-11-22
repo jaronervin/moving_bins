@@ -1,7 +1,7 @@
 """Emails to renters and owners. Text bodies live in templates/rentals/email/."""
 
 from django.conf import settings
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage, get_connection
 from django.template.loader import render_to_string
 
 import logging
@@ -12,12 +12,25 @@ from .models import BusinessSettings, Signature
 log = logging.getLogger(__name__)
 
 
-def _send(to, subject_template, body_template, context, attachments=()):
+def _owner_connection():
+    """(connection, from address) for owner alerts: Google Workspace when it's
+    set up, otherwise the site's normal email route."""
+    if settings.GOOGLE_SMTP_USER and settings.GOOGLE_SMTP_APP_PASSWORD:
+        connection = get_connection(
+            "django.core.mail.backends.smtp.EmailBackend", host="smtp.gmail.com", port=587, use_tls=True,
+            username=settings.GOOGLE_SMTP_USER, password=settings.GOOGLE_SMTP_APP_PASSWORD, timeout=15)
+        sender = settings.OWNER_ALERT_FROM or f"Sprout Tote alerts <{settings.GOOGLE_SMTP_USER}>"
+        return connection, sender
+    return None, settings.DEFAULT_FROM_EMAIL
+
+
+def _send(to, subject_template, body_template, context, attachments=(), owners=False):
     """Send one email. A failure is logged, never raised: a booking must not
-    fail because the email service hiccuped."""
+    fail because the email service hiccuped. ``owners=True`` uses the owner route."""
     subject = render_to_string(subject_template, context).strip()
     body = render_to_string(body_template, context)
-    msg = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, to)
+    connection, sender = _owner_connection() if owners else (None, settings.DEFAULT_FROM_EMAIL)
+    msg = EmailMessage(subject, body, sender, to, connection=connection)
     for name, content, mime in attachments:
         msg.attach(name, content, mime)
     try:
@@ -50,7 +63,7 @@ def booking_requested(booking):
               "rentals/email/owner_new_body.txt",
               {**context, "admin_link": admin_link, "needs": needs,
                "ops_link": f"{settings.SITE_URL}/ops/",
-               "lead_days": BusinessSettings.load().purchase_lead_business_days})
+               "lead_days": BusinessSettings.load().purchase_lead_business_days}, owners=True)
 
 
 def booking_links(email, bookings):
@@ -150,7 +163,8 @@ def card_problem(booking, charge):
 
 def owner_alert(subject, body):
     if settings.OWNER_EMAILS:
+        connection, sender = _owner_connection()
         try:
-            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, settings.OWNER_EMAILS)
+            EmailMessage(subject, body, sender, settings.OWNER_EMAILS, connection=connection).send()
         except Exception:
             log.exception("Owner alert %r failed", subject)

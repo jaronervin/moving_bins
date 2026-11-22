@@ -152,6 +152,13 @@ if POSTMARK_SERVER_TOKEN:
     EMAIL_PORT = 587
     EMAIL_HOST_USER = EMAIL_HOST_PASSWORD = POSTMARK_SERVER_TOKEN
 EMAIL_TIMEOUT = 15
+# Owner alerts (new booking, changes, card problems) go through Google
+# Workspace instead, to keep Postmark's monthly count for renters. Set the
+# mailbox and an app password for it; without them, alerts use the route above.
+GOOGLE_SMTP_USER = os.environ.get("GOOGLE_SMTP_USER", "")
+GOOGLE_SMTP_APP_PASSWORD = os.environ.get("GOOGLE_SMTP_APP_PASSWORD", "")
+# Sender for owner alerts: the mailbox itself unless it may send as another address.
+OWNER_ALERT_FROM = os.environ.get("OWNER_ALERT_FROM", "")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Sprout Tote Co. <bookings@localhost>")
 
 # Who gets "new request" emails. Comma-separated.

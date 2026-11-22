@@ -425,7 +425,30 @@ class NoDeletingRecordsTests(FlowTestCase):
 class EmailFailureTests(FlowTestCase):
     def test_booking_still_succeeds_when_email_fails(self):
         with unittest.mock.patch("django.core.mail.EmailMessage.send", side_effect=OSError("smtp down")), \
-                unittest.mock.patch("rentals.emails.send_mail", side_effect=OSError("smtp down")), \
                 self.assertLogs("rentals.emails", level="ERROR"):
             r = self.walk()
         assert_redirects_to_booking(self, r, Booking.objects.get())
+
+
+class OwnerEmailRouteTests(FlowTestCase):
+    @override_settings(GOOGLE_SMTP_USER="jay@sprouttoteco.com", GOOGLE_SMTP_APP_PASSWORD="app-pw",
+                       DEFAULT_FROM_EMAIL="Sprout Tote Co. <hello@sprouttoteco.com>")
+    def test_owner_alerts_go_through_google(self):
+        from django.core.mail import get_connection as real
+        calls = []
+
+        def fake(backend=None, **kwargs):
+            calls.append((backend, kwargs))
+            return real("django.core.mail.backends.locmem.EmailBackend")
+        with unittest.mock.patch("rentals.emails.get_connection", side_effect=fake):
+            self.walk()
+        renter, owner = mail.outbox[0], mail.outbox[1]
+        self.assertEqual(renter.from_email, "Sprout Tote Co. <hello@sprouttoteco.com>")
+        self.assertEqual(owner.from_email, "Sprout Tote alerts <jay@sprouttoteco.com>")
+        self.assertEqual(owner.to, ["owner@example.com"])
+        self.assertEqual(calls[0][1]["host"], "smtp.gmail.com")
+        self.assertEqual(len(calls), 1)  # only the owner email used Google
+
+    def test_without_google_alerts_use_the_normal_route(self):
+        self.walk()
+        self.assertEqual(mail.outbox[1].to, ["owner@example.com"])

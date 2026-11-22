@@ -50,8 +50,11 @@ def _system_status():
         ("Payments", bool(stripe_key), f"Stripe, {mode} mode" if stripe_key else "Off (STRIPE_SECRET_KEY not set)"),
         ("Stripe webhook", s.STRIPE_WEBHOOK_SECRET.startswith("whsec_"),
          "Set" if s.STRIPE_WEBHOOK_SECRET.startswith("whsec_") else "Not set"),
-        ("Email", smtp and bool(s.EMAIL_HOST), f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
-         else "Not sent: written to the server log"),
+        ("Email to renters", smtp and bool(s.EMAIL_HOST), f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
+         else "Not sent: written to the server log (POSTMARK_SERVER_TOKEN not set)"),
+        ("Owner alerts", bool(s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD) or (smtp and bool(s.EMAIL_HOST)),
+         f"Sending via Google as {s.GOOGLE_SMTP_USER}" if s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD
+         else "Same route as renter emails (GOOGLE_SMTP_APP_PASSWORD not set)"),
     ]
 
 
