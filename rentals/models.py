@@ -908,3 +908,18 @@ class BinContents(models.Model):
 
     def __str__(self):
         return f"{self.bin} in {self.booking.reference}"
+
+
+class EmailUsage(models.Model):
+    """Emails sent through Postmark per calendar month (counted per recipient,
+    like Postmark does), so owners are warned before the plan's limit."""
+
+    month = models.DateField(unique=True, help_text="First day of the month.")
+    sent = models.PositiveIntegerField(default=0)
+    warned = models.PositiveIntegerField(default=0, help_text="Highest warning level sent (percent).")
+
+    class Meta:
+        verbose_name_plural = "email usage"
+
+    def __str__(self):
+        return f"{self.month:%B %Y}: {self.sent}"

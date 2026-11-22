@@ -156,6 +156,10 @@ All in the admin (Business settings, Products, Packages):
 - [ ] **Stripe payment methods (live mode):** Settings › Payment methods: turn off Link, Amazon Pay and Affirm
       (they hide card details, so signatures lose the card brand, last 4 and bank address checks). Keep cards,
       Apple Pay, Google Pay. Already done in test mode.
+- [ ] **Postmark:** approval requested/granted; upgrade the plan before bookings exceed ~12–15/month (the site
+      warns owners at 70% and 90% of `POSTMARK_MONTHLY_LIMIT`; set it to the new plan's limit after upgrading).
+- [ ] **Render paid plan:** then set up owner alerts through Google (`GOOGLE_SMTP_USER` + app password); the
+      free plan blocks email ports.
 - [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
 
 ## Progress

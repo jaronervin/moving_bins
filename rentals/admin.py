@@ -14,6 +14,7 @@ from .models import (
     Charge,
     CheckIn,
     Customer,
+    EmailUsage,
     Package,
     PackageItem,
     PriceLine,
@@ -340,3 +341,8 @@ class BinAdmin(admin.ModelAdmin):
 class BinContentsAdmin(admin.ModelAdmin):
     list_display = ["bin", "booking", "room", "fragile", "open_first", "updated_at"]
     search_fields = ["bin__code", "booking__reference"]
+
+
+@admin.register(EmailUsage)
+class EmailUsageAdmin(admin.ModelAdmin):
+    list_display = ["month", "sent", "warned"]

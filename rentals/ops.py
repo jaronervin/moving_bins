@@ -35,6 +35,15 @@ staff_required = user_passes_test(lambda u: u.is_active and u.is_staff)
 MODES = {"load": "Load for dropoff", "pickup": "Pickup"}
 
 
+def _postmark_usage(s):
+    from .models import EmailUsage
+
+    usage = EmailUsage.objects.filter(month=timezone.localdate().replace(day=1)).first()
+    sent = usage.sent if usage else 0
+    return ("Postmark this month", sent < 0.9 * s.POSTMARK_MONTHLY_LIMIT,
+            f"{sent} of {s.POSTMARK_MONTHLY_LIMIT} emails")
+
+
 def _system_status():
     """Which outside services are really switched on. Never shows a key."""
     from django.conf import settings as s
@@ -54,6 +63,7 @@ def _system_status():
         ("Email to renters", postmark or (smtp and bool(s.EMAIL_HOST)),
          "Sending via Postmark" if postmark else f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
          else "Not sent: written to the server log (POSTMARK_SERVER_TOKEN not set)"),
+        _postmark_usage(s) if postmark else ("Postmark this month", True, "Not in use yet"),
         ("Owner alerts", bool(s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD) or postmark or (smtp and bool(s.EMAIL_HOST)),
          f"Sending via Google as {s.GOOGLE_SMTP_USER}" if s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD
          else "Same route as renter emails (GOOGLE_SMTP_APP_PASSWORD not set)"),

@@ -302,3 +302,37 @@ class PostmarkBackendTests(TestCase):
         self.assertEqual(sent["body"]["To"], "a@example.com, b@example.com")
         self.assertEqual(sent["body"]["MessageStream"], "outbound")
         self.assertEqual(sent["body"]["Attachments"][0]["Name"], "a.pdf")
+
+
+@override_settings(POSTMARK_SERVER_TOKEN="pm-token", EMAIL_BACKEND="rentals.mail_backends.PostmarkBackend",
+                   POSTMARK_MONTHLY_LIMIT=10, OWNER_EMAILS=["owner@example.com"])
+class PostmarkUsageTests(TestCase):
+    def test_counts_and_warns_once_per_level(self):
+        from django.core.mail import EmailMessage
+
+        from rentals.models import EmailUsage
+        bodies = []
+
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, *a): return b"{}"
+
+        def fake_urlopen(req, timeout=None):
+            import json as j
+            bodies.append(j.loads(req.data))
+            return Resp()
+        with mock.patch("rentals.mail_backends.urllib.request.urlopen", side_effect=fake_urlopen):
+            for _ in range(6):
+                EmailMessage("Hi", "x", "a@b.c", ["r@example.com"]).send()
+            self.assertEqual([b["Subject"] for b in bodies if "Postmark:" in b["Subject"]], [])
+            EmailMessage("Hi", "x", "a@b.c", ["r@example.com"]).send()  # 7 of 10 → 70% warning
+            warnings = [b for b in bodies if b["Subject"].startswith("Postmark:")]
+            self.assertEqual(len(warnings), 1)
+            self.assertIn("7 of 10", warnings[0]["Subject"])
+            EmailMessage("Hi", "x", "a@b.c", ["r@example.com"]).send()  # 9 incl. the warning → 90%
+            self.assertEqual(len([b for b in bodies if b["Subject"].startswith("Postmark:")]), 2)
+            for _ in range(3):
+                EmailMessage("Hi", "x", "a@b.c", ["r@example.com"]).send()
+        self.assertEqual(len([b for b in bodies if b["Subject"].startswith("Postmark:")]), 2)  # no repeats
+        self.assertEqual(EmailUsage.objects.get().sent, 13)  # 11 sent + the 2 warnings themselves

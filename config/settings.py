@@ -148,6 +148,8 @@ EMAIL_USE_TLS = True
 # it, mail goes to the log.
 POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
 POSTMARK_MESSAGE_STREAM = os.environ.get("POSTMARK_MESSAGE_STREAM", "outbound")
+# Postmark plan's monthly limit; owners are warned at 70% and 90%.
+POSTMARK_MONTHLY_LIMIT = int(os.environ.get("POSTMARK_MONTHLY_LIMIT", "100"))
 if POSTMARK_SERVER_TOKEN:
     EMAIL_BACKEND = "rentals.mail_backends.PostmarkBackend"
 EMAIL_TIMEOUT = 15
