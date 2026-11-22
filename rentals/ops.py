@@ -42,6 +42,7 @@ def _system_status():
     stripe_key = s.STRIPE_SECRET_KEY or ""
     mode = "live" if stripe_key.startswith(("sk_live", "rk_live")) else "test"
     smtp = "smtp" in s.EMAIL_BACKEND
+    postmark = "Postmark" in s.EMAIL_BACKEND
     return [
         ("Address checks", s.MAPS_BACKEND == "google",
          "Google" if s.MAPS_BACKEND == "google" else "Estimated from ZIP codes (GOOGLE_MAPS_API_KEY not set)"),
@@ -50,9 +51,10 @@ def _system_status():
         ("Payments", bool(stripe_key), f"Stripe, {mode} mode" if stripe_key else "Off (STRIPE_SECRET_KEY not set)"),
         ("Stripe webhook", s.STRIPE_WEBHOOK_SECRET.startswith("whsec_"),
          "Set" if s.STRIPE_WEBHOOK_SECRET.startswith("whsec_") else "Not set"),
-        ("Email to renters", smtp and bool(s.EMAIL_HOST), f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
+        ("Email to renters", postmark or (smtp and bool(s.EMAIL_HOST)),
+         "Sending via Postmark" if postmark else f"Sending via {s.EMAIL_HOST}" if smtp and s.EMAIL_HOST
          else "Not sent: written to the server log (POSTMARK_SERVER_TOKEN not set)"),
-        ("Owner alerts", bool(s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD) or (smtp and bool(s.EMAIL_HOST)),
+        ("Owner alerts", bool(s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD) or postmark or (smtp and bool(s.EMAIL_HOST)),
          f"Sending via Google as {s.GOOGLE_SMTP_USER}" if s.GOOGLE_SMTP_USER and s.GOOGLE_SMTP_APP_PASSWORD
          else "Same route as renter emails (GOOGLE_SMTP_APP_PASSWORD not set)"),
     ]

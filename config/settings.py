@@ -143,14 +143,13 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
-# Postmark: setting just the server token turns real sending on (SMTP, where
-# the token is both username and password). Without it, mail goes to the log.
+# Postmark: setting just the server token turns real sending on, through its
+# HTTPS API (rentals/mail_backends.py; hosts may block email ports). Without
+# it, mail goes to the log.
 POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
+POSTMARK_MESSAGE_STREAM = os.environ.get("POSTMARK_MESSAGE_STREAM", "outbound")
 if POSTMARK_SERVER_TOKEN:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = "smtp.postmarkapp.com"
-    EMAIL_PORT = 587
-    EMAIL_HOST_USER = EMAIL_HOST_PASSWORD = POSTMARK_SERVER_TOKEN
+    EMAIL_BACKEND = "rentals.mail_backends.PostmarkBackend"
 EMAIL_TIMEOUT = 15
 # Owner alerts (new booking, changes, card problems) go through Google
 # Workspace instead, to keep Postmark's monthly count for renters. Set the

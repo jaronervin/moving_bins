@@ -123,7 +123,8 @@ class CardNameTests(FlowTestCase):
         r = self.client.post(f"/b/{self.token}/sign/", {"agree": "on", "typed_name": "Pat Renter"})
         self.assertRedirects(r, f"/b/{self.token}/sign/", fetch_redirect_response=False)  # still wrong
 
-        r = self.client.post(f"/b/{self.token}/sign/", {"agree": "on", "typed_name": "Sam Payer"})
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f"/b/{self.token}/sign/", {"agree": "on", "typed_name": "Sam Payer"})
         self.booking.refresh_from_db()
         self.assertEqual((self.booking.status, self.booking.stripe_payment_method_id), ("confirmed", "pm_9"))
         self.assertEqual(self.booking.signature.typed_name, "Sam Payer")

@@ -204,7 +204,8 @@ class CardStepFlowTests(FlowTestCase):
         self.assertIn("{CHECKOUT_SESSION_ID}", params["return_url"])
 
         self.stripe.v1.checkout.sessions.retrieve.return_value = checkout_done(booking, "Pat Renter")
-        r = self.client.get(card_url + "done?session_id=cs_9")
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.get(card_url + "done?session_id=cs_9")
         booking.refresh_from_db()
         self.assertEqual((booking.status, booking.stripe_payment_method_id), ("confirmed", "pm_9"))
         self.assertIn("You're booked", mail.outbox[0].subject)
@@ -274,3 +275,30 @@ class LiveStripeTests(TestCase):
         self.assertEqual(payments.release(b).status, Charge.Status.RELEASED)
         damage = payments.charge(b, Charge.Kind.DAMAGE, D("15.00"), "Lost tote")
         self.assertEqual((damage.status, damage.captured_amount), (Charge.Status.CAPTURED, D("15.00")))
+
+
+class PostmarkBackendTests(TestCase):
+    @override_settings(POSTMARK_SERVER_TOKEN="pm-token", EMAIL_BACKEND="rentals.mail_backends.PostmarkBackend")
+    def test_sends_json_with_attachment(self):
+        import json as j
+
+        from django.core.mail import EmailMessage
+        sent = {}
+
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, *a): return b'{"ErrorCode":0}'
+
+        def fake_urlopen(req, timeout=None):
+            sent["url"], sent["headers"], sent["body"] = req.full_url, dict(req.headers), j.loads(req.data)
+            return Resp()
+        with mock.patch("rentals.mail_backends.urllib.request.urlopen", side_effect=fake_urlopen):
+            msg = EmailMessage("Hi", "Body", "Sprout <hello@sprouttoteco.com>", ["a@example.com", "b@example.com"])
+            msg.attach("a.pdf", b"%PDF-1", "application/pdf")
+            self.assertEqual(msg.send(), 1)
+        self.assertEqual(sent["url"], "https://api.postmarkapp.com/email")
+        self.assertEqual(sent["headers"]["X-postmark-server-token"], "pm-token")
+        self.assertEqual(sent["body"]["To"], "a@example.com, b@example.com")
+        self.assertEqual(sent["body"]["MessageStream"], "outbound")
+        self.assertEqual(sent["body"]["Attachments"][0]["Name"], "a.pdf")

@@ -18,7 +18,7 @@ def _owner_connection():
     if settings.GOOGLE_SMTP_USER and settings.GOOGLE_SMTP_APP_PASSWORD:
         connection = get_connection(
             "django.core.mail.backends.smtp.EmailBackend", host="smtp.gmail.com", port=587, use_tls=True,
-            username=settings.GOOGLE_SMTP_USER, password=settings.GOOGLE_SMTP_APP_PASSWORD, timeout=15)
+            username=settings.GOOGLE_SMTP_USER, password=settings.GOOGLE_SMTP_APP_PASSWORD, timeout=8)
         sender = settings.OWNER_ALERT_FROM or f"Sprout Tote alerts <{settings.GOOGLE_SMTP_USER}>"
         return connection, sender
     return None, settings.DEFAULT_FROM_EMAIL
@@ -33,10 +33,22 @@ def _send(to, subject_template, body_template, context, attachments=(), owners=F
     msg = EmailMessage(subject, body, sender, to, connection=connection)
     for name, content, mime in attachments:
         msg.attach(name, content, mime)
+    _deliver(msg)
+
+
+def _deliver(msg):
+    """Send; if the owner route (Google) fails, fall back to the normal route."""
     try:
         msg.send()
+        return
     except Exception:
-        log.exception("Email %r to %s failed", subject, to)
+        log.exception("Email %r to %s failed", msg.subject, msg.to)
+    if msg.connection is not None:  # Google route failed: try the site's normal route once
+        msg.connection, msg.from_email = None, settings.DEFAULT_FROM_EMAIL
+        try:
+            msg.send()
+        except Exception:
+            log.exception("Fallback for %r failed too", msg.subject)
 
 
 def booking_requested(booking):
@@ -164,7 +176,4 @@ def card_problem(booking, charge):
 def owner_alert(subject, body):
     if settings.OWNER_EMAILS:
         connection, sender = _owner_connection()
-        try:
-            EmailMessage(subject, body, sender, settings.OWNER_EMAILS, connection=connection).send()
-        except Exception:
-            log.exception("Owner alert %r failed", subject)
+        _deliver(EmailMessage(subject, body, sender, settings.OWNER_EMAILS, connection=connection))

@@ -175,7 +175,9 @@ def finish_card_setup(booking, session_id):
         from . import emails, services
 
         services.card_saved(booking)
-        emails.booking_requested(booking)
+        # Send once the card and confirmation are committed, so a slow or failing
+        # email can never undo them.
+        transaction.on_commit(lambda: emails.booking_requested(booking))
     elif booking.status == Booking.Status.CONFIRMED and due_for_authorization().filter(pk=booking.pk).exists():
         authorize(booking)  # a new card after a failed hold: try again now
     return SAVED
