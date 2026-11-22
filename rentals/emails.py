@@ -4,20 +4,26 @@ from django.conf import settings
 from django.core.mail import EmailMessage, send_mail
 from django.template.loader import render_to_string
 
+import logging
+
 from .links import booking_url
 from .models import BusinessSettings, Signature
 
+log = logging.getLogger(__name__)
+
 
 def _send(to, subject_template, body_template, context, attachments=()):
+    """Send one email. A failure is logged, never raised: a booking must not
+    fail because the email service hiccuped."""
     subject = render_to_string(subject_template, context).strip()
     body = render_to_string(body_template, context)
-    if not attachments:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, to)
-        return
     msg = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, to)
     for name, content, mime in attachments:
         msg.attach(name, content, mime)
-    msg.send()
+    try:
+        msg.send()
+    except Exception:
+        log.exception("Email %r to %s failed", subject, to)
 
 
 def booking_requested(booking):
@@ -144,4 +150,7 @@ def card_problem(booking, charge):
 
 def owner_alert(subject, body):
     if settings.OWNER_EMAILS:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, settings.OWNER_EMAILS)
+        try:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, settings.OWNER_EMAILS)
+        except Exception:
+            log.exception("Owner alert %r failed", subject)

@@ -54,6 +54,9 @@ services:
         sync: false
       - key: OWNER_EMAILS
         sync: false
-      # Email stays off (printed to Render's logs) until an email provider is set up.
+      # Email: printed to Render's logs until POSTMARK_SERVER_TOKEN (secret) is
+      # added in Render's dashboard; then it's sent through Postmark.
       - key: EMAIL_BACKEND
         value: django.core.mail.backends.console.EmailBackend
+      - key: DEFAULT_FROM_EMAIL
+        value: "Sprout Tote Co. <hello@sprouttoteco.com>"

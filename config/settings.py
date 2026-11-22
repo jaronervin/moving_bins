@@ -143,6 +143,15 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = True
+# Postmark: setting just the server token turns real sending on (SMTP, where
+# the token is both username and password). Without it, mail goes to the log.
+POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
+if POSTMARK_SERVER_TOKEN:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = "smtp.postmarkapp.com"
+    EMAIL_PORT = 587
+    EMAIL_HOST_USER = EMAIL_HOST_PASSWORD = POSTMARK_SERVER_TOKEN
+EMAIL_TIMEOUT = 15
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Sprout Tote Co. <bookings@localhost>")
 
 # Who gets "new request" emails. Comma-separated.

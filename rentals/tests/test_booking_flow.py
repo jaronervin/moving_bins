@@ -420,3 +420,12 @@ class NoDeletingRecordsTests(FlowTestCase):
         self.assertContains(page, "Bookings are kept (not deleted)")
         b = Booking.objects.get()
         self.assertEqual(self.client.get(f"/admin/rentals/booking/{b.pk}/delete/").status_code, 403)
+
+
+class EmailFailureTests(FlowTestCase):
+    def test_booking_still_succeeds_when_email_fails(self):
+        with unittest.mock.patch("django.core.mail.EmailMessage.send", side_effect=OSError("smtp down")), \
+                unittest.mock.patch("rentals.emails.send_mail", side_effect=OSError("smtp down")), \
+                self.assertLogs("rentals.emails", level="ERROR"):
+            r = self.walk()
+        assert_redirects_to_booking(self, r, Booking.objects.get())
