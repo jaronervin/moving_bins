@@ -45,9 +45,8 @@ Every rental starts from a package (prices for 2 weeks, from Katie's sheet):
 | 2BR | 40 | 2 dollies | $169 | $65 |
 | 3BR | 60 | 2 dollies | $229 | $85 |
 | Whole Home | 80 | 3 dollies, 1 hand truck | $299 | $99 |
-| *Premium (planned)* | | Whole Home plus moving blankets, door jamb protectors, etc. | ~$449 | |
-
-The premium tier is waiting on the full list of what's included.
+Planned: a **$79 premium upgrade** (moving blankets, door jamb protectors, etc.)
+instead of a separate top package. Contents and rules to come from Katie (§13).
 
 - **Extra totes:** $5 each for the first 2 weeks, then $3 per tote per extra
   week. Priced so a package plus extra totes never undercuts the next
@@ -533,8 +532,10 @@ to add later.
 
 ## 13. Open questions
 
-1. Premium package above Whole Home: what's included (moving blankets,
-   door jamb protectors, …) and its price.
+1. Premium upgrade (decided: Whole Home stays $299; a **$79 upgrade** adds
+   moving blankets, door jamb protectors, etc.). Waiting on Katie: the full
+   list and quantities, whether any package can add it, and whether $79 is
+   one-time like other extras.
 2. Fee for the 20–35 mile zone ($25 for now).
 3. City list for the service area: replace or supplement the radius?
 4. Straight-line vs driving miles for the 20/35-mile zones (parked). Straight-line
