@@ -469,3 +469,18 @@ class UpgradeTests(FlowTestCase):
         self.step_package()
         r = self.client.post("/book/extras/", {"addon_totes": 0, "upgrade": "on"})
         self.assertContains(r, "check availability for 10 moving blankets")
+
+
+class UpgradeOnlyItemTests(FlowTestCase):
+    def test_item_only_in_the_upgrade(self):
+        from rentals.models import Product, Upgrade, UpgradeItem
+        covers = Product.objects.create(name="Mattress cover", slug="mattress-cover", kind="rental", price=D("0"),
+                                        offered_alone=False, track_stock=True, planned_capacity=10)
+        UpgradeItem.objects.create(upgrade=Upgrade.objects.get(), product=covers, quantity=2)
+        self.step_package()
+        page = self.client.get("/book/extras/")
+        self.assertContains(page, "2 mattress covers")  # listed inside the upgrade
+        self.assertNotContains(page, f'name="x_{covers.pk}"')  # not offered on its own
+        self.client.post("/book/extras/", {"addon_totes": 0, "upgrade": "on"})
+        order = services.order_from_draft(self.client.session["draft"])
+        self.assertEqual(dict(order.items())[covers], 2)

@@ -213,6 +213,10 @@ class Product(models.Model):
         max_digits=8, decimal_places=2, default=Decimal("0"),
         help_text="Totes: price per extra tote for each week beyond the minimum.",
     )
+    offered_alone = models.BooleanField(
+        "Show on the Extras step", default=True,
+        help_text="Untick for items that only come inside a package or upgrade (still tracked and counted).",
+    )
     track_stock = models.BooleanField(
         default=True,
         help_text="Check stock before booking. Untick for items you haven't counted yet "

@@ -122,7 +122,7 @@ def extras(request):
     if (r := _guard(request, "extras")):
         return r
     draft = _draft(request)
-    products = Product.objects.filter(active=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
+    products = Product.objects.filter(active=True, offered_alone=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
     upgrade = Upgrade.objects.filter(active=True).prefetch_related("items__product").first()
     initial = {"addon_totes": draft.get("addon_totes", 0), "upgrade": bool(draft.get("upgrade")),
                **{f"x_{k}": v for k, v in draft.get("extras", {}).items()}}

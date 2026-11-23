@@ -78,7 +78,7 @@ class UpgradeAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["name", "kind", "price", "active", "track_stock", "ready", "out", "awaiting",
+    list_display = ["name", "kind", "price", "active", "offered_alone", "track_stock", "ready", "out", "awaiting",
                     "out_of_service", "retired"]
     list_filter = ["kind", "active"]
     prepopulated_fields = {"slug": ["name"]}

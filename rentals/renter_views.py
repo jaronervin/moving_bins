@@ -54,7 +54,7 @@ def change(request, token):
     except services.CannotChange as exc:
         messages.error(request, str(exc))
         return redirect(booking_url(booking))
-    products = Product.objects.filter(active=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
+    products = Product.objects.filter(active=True, offered_alone=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
     package_form = PackageForm(request.POST or None, min_notice_days=s.min_notice_days, min_weeks=s.min_weeks,
                                max_weeks=s.max_weeks, initial={
                                    "package": current.package.pk, "weeks": current.weeks,
