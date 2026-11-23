@@ -576,11 +576,11 @@ def set_pickup_address(booking, address_data, miles):
 def address_change_allowed(booking, kind, now=None):
     """Can the renter change this address online right now? (bool, reason if not)"""
     now = now or timezone.now()
-    if kind == "dropoff":
+    if kind == "dropoff":  # until the day before: the route is planned on the day
         if booking.status not in CHANGEABLE_STATUSES:
             return False, "The totes are already delivered."
-        if now >= changes_allowed_until(booking):
-            return False, f"Changes close {BusinessSettings.load().cancel_cutoff_hours} hours before dropoff."
+        if timezone.localdate(now) >= booking.dropoff_date:
+            return False, "It's dropoff day."
         return True, ""
     if booking.status not in CHANGEABLE_STATUSES + [Booking.Status.OUT]:
         return False, "This booking can't be changed online anymore."

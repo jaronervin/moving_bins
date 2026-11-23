@@ -374,11 +374,13 @@ class AddressChangeTests(FlowTestCase):
         self.assertContains(r, "we serve within 35 miles")
         self.assertEqual(Booking.objects.get().dropoff_address.line1, "10 Elm St")
 
-    def test_dropoff_locked_after_cutoff(self):
-        with mock.patch.object(timezone, "now", return_value=services.free_cancel_until(self.booking)):
-            ok, reason = services.address_change_allowed(self.booking, "dropoff")
+    def test_dropoff_address_until_the_day_before(self):
+        from datetime import datetime
+        day_before = timezone.make_aware(datetime.combine(self.dropoff - timedelta(days=1), time(20)))
+        self.assertTrue(services.address_change_allowed(self.booking, "dropoff", day_before)[0])
+        ok, reason = services.address_change_allowed(self.booking, "dropoff", day_before + timedelta(hours=5))
         self.assertFalse(ok)
-        self.assertIn("72 hours", reason)
+        self.assertIn("dropoff day", reason)
 
     def test_after_dropoff_same_fee_ok_but_fee_change_needs_us(self):
         Booking.objects.filter(pk=self.booking.pk).update(status=Booking.Status.OUT)
