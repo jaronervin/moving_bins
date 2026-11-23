@@ -589,6 +589,13 @@ def address_change_allowed(booking, kind, now=None):
     return True, ""
 
 
+def address_fee_after(booking, kind, miles):
+    """Total delivery fees if this address moved to ``miles`` away. Raises OutOfRange."""
+    drop = miles if kind == "dropoff" else (booking.dropoff_miles or 0)
+    pick = miles if kind == "pickup" else booking.pickup_miles
+    return sum((a for _, a in delivery_fees(drop, pick)), pricing.ZERO)
+
+
 @transaction.atomic
 def change_address(booking, kind, address_data, miles, now=None):
     """Change the dropoff or pickup address, re-pricing the delivery fees.

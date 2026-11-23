@@ -7,8 +7,24 @@
   <p class="muted">Free within {{ settings.free_radius_miles }} miles of us; {{ settings.free_radius_miles }}–{{ settings.max_radius_miles }} miles
     adds ${{ settings.extended_zone_fee|floatformat:0 }}.</p>
   <form method="post">{% csrf_token %}
+    {% if price_change %}
+      <div class="callout warn" role="alert">
+        <b>This changes your price.</b>
+        <span>{{ price_change.found }} is about {{ price_change.miles|floatformat:0 }} miles from us, so delivery fees
+          go from ${{ price_change.old_fee }} to ${{ price_change.new_fee }}.
+          Your total before tax becomes ${{ price_change.new_total }} (was ${{ price_change.old_total }}).</span>
+      </div>
+    {% endif %}
     {{ form }}
-    <button type="submit">Save address</button>
+    {% if price_change %}
+      <div class="button-row">
+        <button type="submit" class="secondary">Check address again</button>
+        <button type="submit" name="confirm" value="1">Save address and new price</button>
+      </div>
+      <p class="muted">Not right? Fix the address above and check it again.</p>
+    {% else %}
+      <button type="submit">Save address</button>
+    {% endif %}
   </form>
   <p><a href="{% url 'booking_detail' token %}">Back to my booking</a></p>
 </section>

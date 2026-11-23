@@ -12,7 +12,7 @@ from django.shortcuts import redirect, render
 from . import emails, maps, payments, pricing, services, windows
 from .forms import AddressForm, ExtrasForm, PackageForm
 from .links import booking_url
-from .models import BusinessSettings, Package, Product
+from .models import Booking, BusinessSettings, Package, Product
 from .payment_views import _booking
 
 
@@ -130,12 +130,23 @@ def change_address(request, token, kind):
     initial = {k: getattr(current, k) for k in ("line1", "line2", "city", "state", "zip_code")} if current else None
     form = AddressForm(request.POST or None, prefix=kind, initial=initial)
     s = BusinessSettings.load()
+    price_change = None
     if request.method == "POST" and form.is_valid():
         address = {k: form.cleaned_data.get(k, "") for k in ("line1", "line2", "city", "state", "zip_code")}
         try:
             place, miles = maps.lookup(address, s.base_lat, s.base_lng)
+            new_fee = services.address_fee_after(booking, kind, miles)
+            if (new_fee != booking.delivery_fee and request.POST.get("confirm") != "1"
+                    and booking.status != Booking.Status.OUT):  # after dropoff, change_address refuses instead
+                total = sum((l.amount for l in booking.price_lines.all()), pricing.ZERO)
+                price_change = {"miles": miles, "old_fee": booking.delivery_fee, "new_fee": new_fee,
+                                "old_total": total, "new_total": total - booking.delivery_fee + new_fee,
+                                "found": place.formatted.replace(", USA", "")}
+                raise _Preview(None)
             booking = services.change_address(booking, kind, {**address, "lat": place.lat, "lng": place.lng,
                                                               "place_id": place.place_id}, miles)
+        except _Preview:
+            pass
         except (maps.AddressNotFound, pricing.PricingError, services.CannotChange) as exc:
             form.add_error(None, str(exc))
         except maps.MapsUnavailable as exc:
@@ -146,5 +157,5 @@ def change_address(request, token, kind):
             return redirect(booking_url(booking))
     return render(request, "rentals/change_address.html", {
         "booking": booking, "form": form, "kind": kind, "label": ADDRESS_LABELS[kind], "current": current,
-        "settings": s, "token": token,
+        "settings": s, "token": token, "price_change": price_change,
     })

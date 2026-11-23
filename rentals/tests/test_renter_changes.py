@@ -349,10 +349,12 @@ class AddressChangeTests(FlowTestCase):
         self.token = links.make_token(self.booking)
         mail.outbox.clear()
 
-    def post(self, kind, zip_code, line1="9 New St"):
-        return self.client.post(f"/b/{self.token}/address/{kind}/", {
-            f"{kind}-line1": line1, f"{kind}-line2": "", f"{kind}-city": "Baltimore",
-            f"{kind}-state": "MD", f"{kind}-zip_code": zip_code}, follow=True)
+    def post(self, kind, zip_code, line1="9 New St", confirm=False):
+        data = {f"{kind}-line1": line1, f"{kind}-line2": "", f"{kind}-city": "Baltimore",
+                f"{kind}-state": "MD", f"{kind}-zip_code": zip_code}
+        if confirm:
+            data["confirm"] = "1"
+        return self.client.post(f"/b/{self.token}/address/{kind}/", data, follow=True)
 
     def test_change_links_on_booking_page(self):
         page = self.client.get(f"/b/{self.token}/")
@@ -360,7 +362,7 @@ class AddressChangeTests(FlowTestCase):
         self.assertContains(page, f"/b/{self.token}/address/pickup/")
 
     def test_pickup_moves_into_free_zone(self):
-        r = self.post("pickup", "21218")
+        r = self.post("pickup", "21218", confirm=True)
         self.assertContains(r, "Address updated")
         b = Booking.objects.get()
         self.assertEqual((b.pickup_address.line1, b.pickup_miles, b.delivery_fee), ("9 New St", 4, D("0")))
@@ -390,3 +392,19 @@ class AddressChangeTests(FlowTestCase):
         self.assertEqual(Booking.objects.get().pickup_address.zip_code, "21403")
         self.assertContains(self.client.get(f"/b/{self.token}/address/dropoff/", follow=True),
                             "already delivered")
+
+
+class AddressPriceConfirmTests(AddressChangeTests):
+    def test_price_change_needs_confirming(self):
+        r = self.post("pickup", "21218")  # 26 mi ($25) → 4 mi (free)
+        self.assertContains(r, "This changes your price")
+        self.assertContains(r, "delivery fees\n          go from $25.00 to $0")
+        self.assertEqual(Booking.objects.get().pickup_address.zip_code, "21401")  # not saved yet
+        self.assertLess(r.content.index(b"Check address again"), r.content.index(b"Save address and new price"))
+        r = self.post("pickup", "21218", confirm=True)
+        self.assertContains(r, "Address updated")
+        self.assertEqual(Booking.objects.get().delivery_fee, D("0"))
+
+    def test_same_price_saves_straight_away(self):
+        self.assertContains(self.post("pickup", "21403"), "Address updated")  # 28 mi: still $25
+
