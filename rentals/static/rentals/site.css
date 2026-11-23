@@ -205,3 +205,5 @@ button.danger { background: var(--warn); border-color: var(--warn); }
 .small-label { font-size: .85rem; font-weight: 600; margin: 8px 0 4px; display: block; }
 .door .button-row button { margin-top: 12px; }
 .door-done { margin-top: 10px; font-weight: 700; color: var(--accent); }
+.with-action { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.with-action .link-button { font-size: .9rem; }

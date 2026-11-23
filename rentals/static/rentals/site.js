@@ -5,6 +5,7 @@
  *   data-confirm="…"      click on a button/link → ask first; cancel if "No"
  *   #tote-search          filters the renter's tote list as they type
  *   input[data-phone]     formats US numbers as you type: 7037032511 → (703) 703-2511
+ *   [data-swap-addresses] swaps the moving-out and moving-in address boxes
  */
 (function () {
   "use strict";
@@ -46,6 +47,23 @@
     var formatted = el.value && el.value.trim()[0] !== "+" && formatPhone(el.value.replace(/\D/g, ""));
     if (formatted) el.value = formatted;
   });
+
+  // Addresses step: swap moving-out and moving-in (e.g. the checked address
+  // was really the new home).
+  var swap = document.querySelector("[data-swap-addresses]");
+  if (swap) {
+    swap.addEventListener("click", function () {
+      ["line1", "line2", "city", "state", "zip_code"].forEach(function (f) {
+        var a = document.querySelector("[name='dropoff-" + f + "']");
+        var b = document.querySelector("[name='pickup-" + f + "']");
+        if (!a || !b) return;
+        var t = a.value; a.value = b.value; b.value = t;
+      });
+      var unknown = document.querySelector("[name='pickup-unknown']");
+      var pickupFilled = (document.querySelector("[name='pickup-line1']") || {}).value;
+      if (unknown && pickupFilled) unknown.checked = false;  // it's known now
+    });
+  }
 
   // "Do we deliver to you?": ask the server and show the answer in place.
   var area = document.getElementById("area-check");
