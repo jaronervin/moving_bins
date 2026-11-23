@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+We came by to pick up your totes, but they weren't ready, so your rental is
+extended one week as in your rental agreement{% if booking.renewal_week_price %} (${{ booking.renewal_week_price }}){% endif %}.
+
+New pickup: {{ booking.pickup_date|date:"l, F j" }}{% if window %}, ready by {{ window.start|time:"g:i A" }}{% endif %}
+{% if booking.pickup_address %}at {{ booking.pickup_address }}{% endif %}
+
+If they'll be ready sooner, reply or call us and we'll try to come earlier.
+
+Your booking: {{ link }}
+{{ contact_email }} · {{ contact_phone }}{% endautoescape %}

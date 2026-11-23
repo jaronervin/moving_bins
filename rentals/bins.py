@@ -186,7 +186,11 @@ def complete_dropoff(booking, user=None, now=None):
     short = [f"{n} of {want} {p}" for p, n, want in load_progress(booking) if n != want]
     if short:
         raise BinError("Load isn't complete: " + "; ".join(short) + ".")
-    inventory.record_dropoff(booking, user)  # counted (non-serialized) items, if any
+    try:
+        inventory.record_dropoff(booking, user)  # counted (non-serialized) items, if any
+    except inventory.InventoryError as exc:
+        raise BinError(f"{exc} If you just bought some, record the purchase first (Admin › Stock movements › "
+                       "Add, kind Purchase), then mark the dropoff again.") from exc
     booking.visits.filter(kind=Visit.Kind.DROPOFF).update(status=Visit.Status.DONE, completed_at=now)
     booking.status = Booking.Status.OUT
     booking.save(update_fields=["status", "updated_at"])

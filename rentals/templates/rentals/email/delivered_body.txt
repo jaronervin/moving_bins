@@ -1,0 +1,13 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Your Sprout Tote Co. totes were just dropped off at {{ booking.dropoff_address }}. Happy packing!
+
+Tip: scan the QR code on any tote with your phone's camera to note what's
+inside it. Then you can search your totes from your booking page.
+
+Pickup: {{ booking.pickup_date|date:"l, F j" }}{% if window %}, have them ready by {{ window.start|time:"g:i A" }}{% endif %}
+{% if booking.pickup_address %}at {{ booking.pickup_address }}{% else %}(please add your moving-in address on your booking page){% endif %}
+
+Need them longer? You can add a week from your booking page: {{ link }}
+
+Questions? {{ contact_email }}{% endautoescape %}

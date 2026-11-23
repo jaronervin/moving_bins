@@ -524,28 +524,38 @@ class CannotExtend(Exception):
 
 
 @transaction.atomic
-def add_week(booking, now=None):
+def add_week(booking, now=None, missed=False):
     """Keep the totes one more week (after dropoff). Charges the locked weekly
-    renewal price to the saved card; nothing changes if that fails."""
+    renewal price to the saved card; nothing changes if that fails.
+
+    ``missed=True`` is the owners' "Not ready" at pickup: allowed on pickup day,
+    and the visit that was missed is recorded as such.
+    """
     from . import payments
-    from .models import Charge
+    from .models import Charge, Visit
 
     now = now or timezone.now()
     booking = Booking.objects.select_for_update().get(pk=booking.pk)
     if booking.status != Booking.Status.OUT:
         raise CannotExtend("You can add weeks once your totes are delivered. Before that, change your booking.")
-    if timezone.localdate(now) >= booking.pickup_date:
+    if not missed and timezone.localdate(now) >= booking.pickup_date:
         raise CannotExtend("It's pickup day, so it's too late to add a week online. Please contact us.")
+    missed_day = booking.pickup_date
     booking.renewals += 1
     booking.pickup_reminded_at = None  # remind again before the new pickup day
     booking.save()  # pickup moves a week later
     items = [(l.product, l.quantity) for l in booking.lines.select_related("product")]
     _check_stock(booking, items, now)
     _move_visit(booking, "pickup", booking.pickup_date, now)
+    if missed:
+        visit = booking.visits.get(kind="pickup")
+        visit.notes = (visit.notes + "\n" if visit.notes else "") + \
+            f"Not ready at pickup on {missed_day:%a %b %-d}; extended a week."
+        visit.save(update_fields=["notes"])
     charge = None
     if payments.enabled() and booking.renewal_week_price:
         charge = payments.charge(booking, Charge.Kind.RENEWAL, booking.renewal_week_price,
-                                 f"Extra week for {booking.reference}")
+                                 f"Extra week for {booking.reference}" + (" (totes not ready at pickup)" if missed else ""))
         if charge is None or charge.status != Charge.Status.CAPTURED:
             reason = (charge.failure_message if charge else "") or "the card was declined"
             transaction.set_rollback(True)

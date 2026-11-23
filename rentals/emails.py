@@ -153,6 +153,22 @@ def pickup_reminder(booking):
            "contact_email": s.contact_email, "contact_phone": s.contact_phone})
 
 
+def delivered(booking):
+    """To the renter when the totes are dropped off."""
+    s = BusinessSettings.load()
+    _send([booking.customer.email], "rentals/email/delivered_subject.txt", "rentals/email/delivered_body.txt",
+          {"booking": booking, "link": booking_url(booking, absolute=True), "contact_email": s.contact_email,
+           "window": _visit_window(booking, "pickup")})
+
+
+def not_ready(booking):
+    """To the renter when totes weren't ready at pickup and the rental was extended a week."""
+    s = BusinessSettings.load()
+    _send([booking.customer.email], "rentals/email/not_ready_subject.txt", "rentals/email/not_ready_body.txt",
+          {"booking": booking, "link": booking_url(booking, absolute=True), "contact_email": s.contact_email,
+           "contact_phone": s.contact_phone, "window": _visit_window(booking, "pickup")})
+
+
 def change_requested(booking):
     """To the renter when the owners ask for a change during the review window."""
     _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",

@@ -242,3 +242,98 @@ class RouteViewTests(FlowTestCase):
         self.assertEqual(len(links), 2)
         self.assertIn("destination=10+Main+St", links[0])
         self.assertIn("origin=10+Main+St", links[1])
+
+
+class DoorTests(FlowTestCase):
+    def setUp(self):
+        super().setUp()
+        self.walk(package="studio")
+        inventory.record_purchase(product("dolly"), 1)  # bought the day of the move
+        self.booking = Booking.objects.get()
+        self.client.login(username="owner", password="x")
+        mail.outbox.clear()
+
+    def visit(self, kind):
+        return self.booking.visits.get(kind=kind)
+
+    def door(self, kind, action, **extra):
+        return self.client.post(f"/ops/visit/{self.visit(kind).pk}/door",
+                                {"action": action, "date": self.dropoff.isoformat(), **extra}, follow=True)
+
+    def load_all(self):
+        from rentals import bins as binlib
+        from rentals.models import Bin, StockState
+        for b in Bin.objects.filter(status=StockState.READY)[:20]:
+            binlib.load_bin(self.booking, b.code)
+
+    def test_route_shows_door_buttons(self):
+        page = self.client.get(f"/ops/day/?date={self.dropoff.isoformat()}")
+        self.assertContains(page, ">Dropped off</button>")
+
+    def test_dropoff_needs_a_full_load(self):
+        r = self.door("dropoff", "dropped_off")
+        self.assertContains(r, "Load isn")
+        self.assertEqual(Booking.objects.get().status, "confirmed")
+
+    def test_dropped_off_with_photo_and_note(self):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+        self.load_all()
+        buf = io.BytesIO()
+        Image.new("RGB", (3000, 2000), "green").save(buf, "JPEG")
+        photo = SimpleUploadedFile("IMG_1.jpg", buf.getvalue(), content_type="image/jpeg")
+        with self.settings(MEDIA_ROOT=self._tmp()):
+            r = self.door("dropoff", "dropped_off", photo=photo, note="Side porch")
+            self.assertContains(r, "dropped off.")
+            v = self.visit("dropoff")
+            self.assertEqual(v.status, "done")
+            self.assertIn("Side porch", v.notes)
+            with Image.open(v.photo.path) as saved:
+                self.assertEqual(max(saved.size), 1600)  # shrunk from 3000 px
+            self.assertEqual(self.client.get(f"/ops/visit/{v.pk}/photo").status_code, 200)
+            self.client.logout()
+            self.assertEqual(self.client.get(f"/ops/visit/{v.pk}/photo").status_code, 302)  # owners only
+        self.assertEqual(Booking.objects.get().status, "out")
+        self.assertIn("Your totes are here", mail.outbox[0].subject)
+
+    def test_picked_up_and_not_ready(self):
+        self.load_all()
+        self.door("dropoff", "dropped_off")
+        TimeWindow.objects.create(date=self.pickup + timedelta(days=7), start=time(9), end=time(13))
+        mail.outbox.clear()
+        r = self.door("pickup", "not_ready", note="Still packing")
+        self.assertContains(r, "not ready, extended to")
+        b = Booking.objects.get()
+        self.assertEqual((b.status, b.renewals, b.pickup_date), ("out", 1, self.pickup + timedelta(days=7)))
+        self.assertIn("Not ready at pickup", self.visit("pickup").notes)
+        self.assertIn("back next week", mail.outbox[0].subject)
+        r = self.door("pickup", "picked_up")
+        self.assertContains(r, "picked up.")
+        self.assertEqual(Booking.objects.get().status, "picked_up")
+
+    def _tmp(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        return d
+
+
+class DoorShortStockTests(DoorTests):
+    """Not bought yet: a clear message, not an error page."""
+
+    def setUp(self):
+        FlowTestCase.setUp(self)
+        self.walk(package="studio")
+        self.booking = Booking.objects.get()
+        self.client.login(username="owner", password="x")
+
+    def test_dropoff_without_the_dolly_on_record(self):
+        self.load_all()
+        r = self.door("dropoff", "dropped_off")
+        self.assertContains(r, "record the purchase first")
+        self.assertEqual(Booking.objects.get().status, "confirmed")
+
+    test_route_shows_door_buttons = test_dropoff_needs_a_full_load = None
+    test_dropped_off_with_photo_and_note = test_picked_up_and_not_ready = None

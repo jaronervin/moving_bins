@@ -109,6 +109,11 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Uploaded files (at-the-door photos). Never served publicly: owners see them
+# through a login-only view. In production this must be a persistent disk
+# (Render Disk mounted here), or photos vanish on each deploy.
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+MEDIA_URL = "/media/"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage" if not DEBUG

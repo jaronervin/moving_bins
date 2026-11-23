@@ -31,6 +31,8 @@ urlpatterns = [
     # Owner tools (staff only)
     path("ops/", ops.index, name="ops_index"),
     path("ops/day/", ops.day, name="ops_day"),
+    path("ops/visit/<int:visit_id>/door", ops.door, name="ops_door"),
+    path("ops/visit/<int:visit_id>/photo", ops.visit_photo, name="ops_visit_photo"),
     path("ops/bin/<str:code>/", ops.bin_detail, name="ops_bin"),
     path("ops/b/<str:reference>/<str:mode>/", ops.scanner, name="ops_scanner"),
     path("ops/check-in/", ops.check_in, name="ops_check_in"),

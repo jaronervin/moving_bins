@@ -200,3 +200,8 @@ button.danger { background: var(--warn); border-color: var(--warn); }
 .stop p { margin: 6px 0 0; }
 .stop-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
 .stop-pickup .badge { background: var(--bg); }
+.door { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.door input[type=file] { padding: 8px; }
+.small-label { font-size: .85rem; font-weight: 600; margin: 8px 0 4px; display: block; }
+.door .button-row button { margin-top: 12px; }
+.door-done { margin-top: 10px; font-weight: 700; color: var(--accent); }

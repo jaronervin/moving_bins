@@ -21,6 +21,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
@@ -117,6 +118,93 @@ def day(request):
         "pickups": sum(1 for s in stops if s.kind == "pickup"),
         "missing": [s for s in stops if not s.address],
     })
+
+
+DOOR_ACTIONS = {"dropped_off", "picked_up", "not_ready"}
+
+
+def _save_photo(visit, upload):
+    """Shrink a phone photo (often 4–8 MB) to a 1600 px JPEG before saving."""
+    import io
+
+    from django.core.files.base import ContentFile
+    from PIL import Image, ImageOps
+
+    img = ImageOps.exif_transpose(Image.open(upload))
+    img.thumbnail((1600, 1600))
+    out = io.BytesIO()
+    img.convert("RGB").save(out, "JPEG", quality=82)
+    visit.photo.save(f"{visit.booking.reference}-{visit.kind}-{timezone.now():%Y%m%d-%H%M}.jpg",
+                     ContentFile(out.getvalue()), save=False)
+
+
+@staff_required
+@require_POST
+def door(request, visit_id):
+    """At-the-door buttons on the route view: dropped off, picked up, not ready."""
+    from . import emails, services
+    from .models import Visit
+
+    visit = get_object_or_404(Visit.objects.select_related("booking__customer"), pk=visit_id)
+    booking, action = visit.booking, request.POST.get("action")
+    back = redirect(f"{reverse('ops_day')}?date={request.POST.get('date', '')}")
+    if action not in DOOR_ACTIONS:
+        return back
+    try:
+        if action == "dropped_off":
+            bins.complete_dropoff(booking, request.user)
+            messages.success(request, f"{booking.reference}: dropped off.")
+            _charge_at_dropoff(request, booking)
+        elif action == "picked_up":
+            unscanned = bins.complete_pickup(booking, request.user)
+            note = f" Scan the {len(unscanned)} totes at check-in." if unscanned else ""
+            messages.success(request, f"{booking.reference}: picked up.{note}")
+        else:
+            booking, charge = services.add_week(booking, missed=True)
+            msg = f"{booking.reference}: not ready, extended to {booking.pickup_date:%a %b %-d}."
+            if charge is not None:
+                msg += f" Charged ${charge.total}."
+            messages.success(request, msg)
+    except bins.BinError as exc:
+        messages.error(request, f"{booking.reference}: {exc}")
+        return back
+    except (services.CannotExtend, services.WindowFull, services.NotEnoughStock) as exc:
+        text = (services.availability_message(exc.product, exc.wanted)
+                if isinstance(exc, services.NotEnoughStock) else str(exc))
+        messages.error(request, f"{booking.reference}: {text} Move the pickup in the admin instead.")
+        return back
+    visit.refresh_from_db()
+    if request.FILES.get("photo"):
+        try:
+            _save_photo(visit, request.FILES["photo"])
+        except Exception:
+            messages.error(request, "The photo couldn't be saved (not an image?). Everything else was recorded.")
+    note = (request.POST.get("note") or "").strip()[:500]
+    if note:
+        visit.notes = (visit.notes + "\n" if visit.notes else "") + note
+    visit.save()
+    booking.refresh_from_db()
+    if action == "dropped_off":
+        emails.delivered(booking)
+    elif action == "not_ready":
+        emails.not_ready(booking)
+    return back
+
+
+@staff_required
+def visit_photo(request, visit_id):
+    """Owners-only view of an at-the-door photo."""
+    from django.http import FileResponse, Http404
+
+    from .models import Visit
+
+    visit = get_object_or_404(Visit, pk=visit_id)
+    if not visit.photo:
+        raise Http404
+    try:
+        return FileResponse(visit.photo.open("rb"), content_type="image/jpeg")
+    except FileNotFoundError:
+        raise Http404("This photo is no longer stored (the test site doesn't keep files between deploys).")
 
 
 def _booking(reference):

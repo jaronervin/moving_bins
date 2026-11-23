@@ -32,8 +32,29 @@
       {% if s.kind == "dropoff" %}<a href="{% url 'ops_scanner' s.booking.reference 'load' %}">Load totes</a>
       {% else %}<a href="{% url 'ops_scanner' s.booking.reference 'pickup' %}">Scan pickup</a>{% endif %}
       · <a href="{% url 'admin:rentals_booking_change' s.booking.pk %}">Booking</a>
-      {% if s.visit.status == "done" %}<span class="badge">Done</span>{% endif %}
     </p>
+    {% if s.visit.status == "done" %}
+      <p class="door-done">✓ {% if s.kind == "dropoff" %}Dropped off{% else %}Picked up{% endif %}
+        {{ s.visit.completed_at|date:"g:i A" }}{% if s.visit.photo %} · <a href="{% url 'ops_visit_photo' s.visit.pk %}" target="_blank" rel="noopener">Photo</a>{% endif %}</p>
+      {% if s.visit.notes %}<p class="muted">{{ s.visit.notes|linebreaksbr }}</p>{% endif %}
+    {% elif s.kind == "dropoff" and s.booking.status == "confirmed" or s.kind == "pickup" and s.booking.status == "out" %}
+      <form method="post" action="{% url 'ops_door' s.visit.pk %}" enctype="multipart/form-data" class="door">{% csrf_token %}
+        <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+        <label for="photo-{{ s.visit.pk }}" class="small-label">Photo (optional)</label>
+        <input type="file" id="photo-{{ s.visit.pk }}" name="photo" accept="image/*" capture="environment">
+        <label for="note-{{ s.visit.pk }}" class="small-label">Note (optional)</label>
+        <input type="text" id="note-{{ s.visit.pk }}" name="note" maxlength="500" placeholder="e.g. Left on side porch">
+        <div class="button-row">
+          {% if s.kind == "dropoff" %}
+            <button type="submit" name="action" value="dropped_off">Dropped off</button>
+          {% else %}
+            <button type="submit" name="action" value="picked_up">Picked up</button>
+            <button type="submit" name="action" value="not_ready" class="secondary"
+                    data-confirm="Totes not ready? This extends {{ s.booking.reference }} a week and charges ${{ s.booking.renewal_week_price }}.">Not ready</button>
+          {% endif %}
+        </div>
+      </form>
+    {% endif %}
   </li>
   {% empty %}
   <li class="card">Nothing scheduled.</li>

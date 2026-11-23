@@ -158,6 +158,8 @@ All in the admin (Business settings, Products, Packages):
       Apple Pay, Google Pay. Already done in test mode.
 - [ ] **Postmark:** approval requested/granted; upgrade the plan before bookings exceed ~12–15/month (the site
       warns owners at 70% and 90% of `POSTMARK_MONTHLY_LIMIT`; set it to the new plan's limit after upgrading).
+- [ ] **Render Disk** (paid plan) mounted at `MEDIA_ROOT` for at-the-door photos; the free plan loses
+      uploaded files on every deploy.
 - [ ] **Render paid plan:** then set up owner alerts through Google (`GOOGLE_SMTP_USER` + app password); the
       free plan blocks email ports.
 - [ ] **Stripe Tax:** Maryland registration + head office address + tax codes (see SPEC §6.2), then switch on.
@@ -171,7 +173,7 @@ All in the admin (Business settings, Products, Packages):
 - [x] 4. Stripe: card saved at booking, hold before dropoff, charge at dropoff, late-cancel/damage/renewal
       charges, webhooks (tax not yet switched on)
 - [x] 5. Agreement signed online at Review; card name check; signed PDF emailed and on the booking page
-- [ ] 6. Owner tools: review inbox, route view (/ops/day/), check-in done; at-the-door photos and
-      "mark dropped off / picked up" from the route view still to do
+- [x] 6. Owner tools: review inbox, route view (/ops/day/) with at-the-door buttons (dropped off /
+      picked up / not ready + photo and note), scanner, check-in
 - [x] 7. Renter change/cancel/add-a-week, reminders, admin bulk cancel (damage charges are in check-in)
 - [ ] 8. Deploy
