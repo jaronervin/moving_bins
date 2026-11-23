@@ -84,6 +84,8 @@ def _manage_context(booking):
     can_change = (booking.status in services.CHANGEABLE_STATUSES and booking.package_id is not None
                   and now < services.changes_allowed_until(booking))
     return {
+        "can_change_dropoff_address": services.address_change_allowed(booking, "dropoff", now)[0],
+        "can_change_pickup_address": services.address_change_allowed(booking, "pickup", now)[0],
         "can_change": can_change,
         "can_cancel": booking.status in services.CANCELLABLE_STATUSES,
         "can_add_week": booking.status == Booking.Status.OUT and timezone.localdate() < booking.pickup_date,

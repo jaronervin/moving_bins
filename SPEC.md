@@ -184,6 +184,9 @@ for that address's bookings.
 - **Keep them another week** once the totes are delivered (until pickup day):
   charges the locked weekly renewal price to the saved card and moves pickup a
   week; nothing changes if the card fails.
+- **Change an address**: moving-out until the cutoff, moving-in until the day
+  before pickup. Checked with Google and re-priced; after dropoff, a change that
+  would alter the delivery fee goes through the owners instead.
 - Each sends the renter an email and the owners an alert.
 - **Reminders** (daily job): `dropoff_reminder_days` (3) before dropoff, with a
   nudge if the moving-in address is missing; `pickup_reminder_days` (2) before

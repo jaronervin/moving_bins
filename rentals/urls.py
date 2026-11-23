@@ -20,6 +20,7 @@ urlpatterns = [
     path("b/<str:token>/cancel/", renter_views.cancel, name="renter_cancel"),
     path("b/<str:token>/change/", renter_views.change, name="renter_change"),
     path("b/<str:token>/add-week/", renter_views.add_week, name="renter_add_week"),
+    path("b/<str:token>/address/<str:kind>/", renter_views.change_address, name="renter_address"),
     path("b/<str:token>/agreement/", views.signed_agreement, name="signed_agreement"),
     path("agreement/", views.agreement, name="agreement"),
     path("stripe/webhook/", payment_views.stripe_webhook, name="stripe_webhook"),

@@ -337,3 +337,54 @@ class DoorShortStockTests(DoorTests):
 
     test_route_shows_door_buttons = test_dropoff_needs_a_full_load = None
     test_dropped_off_with_photo_and_note = test_picked_up_and_not_ready = None
+
+
+class AddressChangeTests(FlowTestCase):
+    """Fake maps: 21218 → 4 mi, 21401 → 26 mi ($25), 20001 → 36 mi (refused)."""
+
+    def setUp(self):
+        super().setUp()
+        self.walk()  # dropoff 21218, pickup 21401 ($25)
+        self.booking = Booking.objects.get()
+        self.token = links.make_token(self.booking)
+        mail.outbox.clear()
+
+    def post(self, kind, zip_code, line1="9 New St"):
+        return self.client.post(f"/b/{self.token}/address/{kind}/", {
+            f"{kind}-line1": line1, f"{kind}-line2": "", f"{kind}-city": "Baltimore",
+            f"{kind}-state": "MD", f"{kind}-zip_code": zip_code}, follow=True)
+
+    def test_change_links_on_booking_page(self):
+        page = self.client.get(f"/b/{self.token}/")
+        self.assertContains(page, f"/b/{self.token}/address/dropoff/")
+        self.assertContains(page, f"/b/{self.token}/address/pickup/")
+
+    def test_pickup_moves_into_free_zone(self):
+        r = self.post("pickup", "21218")
+        self.assertContains(r, "Address updated")
+        b = Booking.objects.get()
+        self.assertEqual((b.pickup_address.line1, b.pickup_miles, b.delivery_fee), ("9 New St", 4, D("0")))
+        self.assertFalse(b.price_lines.filter(kind="delivery").exists())
+        self.assertIn("Address updated", mail.outbox[0].subject)
+        self.assertIn("New pickup address", mail.outbox[1].subject)
+        self.assertEqual(mail.outbox[1].to, ["owner@example.com"])
+
+    def test_too_far_is_refused(self):
+        r = self.post("dropoff", "20001")
+        self.assertContains(r, "we serve within 35 miles")
+        self.assertEqual(Booking.objects.get().dropoff_address.line1, "10 Elm St")
+
+    def test_dropoff_locked_after_cutoff(self):
+        with mock.patch.object(timezone, "now", return_value=services.free_cancel_until(self.booking)):
+            ok, reason = services.address_change_allowed(self.booking, "dropoff")
+        self.assertFalse(ok)
+        self.assertIn("72 hours", reason)
+
+    def test_after_dropoff_same_fee_ok_but_fee_change_needs_us(self):
+        Booking.objects.filter(pk=self.booking.pk).update(status=Booking.Status.OUT)
+        self.assertContains(self.post("pickup", "21403"), "Address updated")  # 28 mi: still $25
+        r = self.post("pickup", "21218")  # free zone would change the fee after the card was charged
+        self.assertContains(r, "changes the delivery fee")
+        self.assertEqual(Booking.objects.get().pickup_address.zip_code, "21403")
+        self.assertContains(self.client.get(f"/b/{self.token}/address/dropoff/", follow=True),
+                            "already delivered")

@@ -55,12 +55,12 @@
       {% with v=visits.dropoff %}
       <dt>Dropoff</dt>
       <dd>{{ booking.dropoff_date|date:"l, M j" }}{% if v %}{% with w=v.window|default:v.proposed_window|default:v.requested_window %}{% if w %}, by {{ w.end|time:"g:i A" }}{% endif %}{% endwith %}{% endif %}
-          <br>{{ booking.dropoff_address }}</dd>
+          <br>{{ booking.dropoff_address }}{% if can_change_dropoff_address %} · <a href="{% url 'renter_address' token 'dropoff' %}">Change</a>{% endif %}</dd>
       {% endwith %}
       {% with v=visits.pickup %}
       <dt>Pickup</dt>
       <dd>{{ booking.pickup_date|date:"l, M j" }}{% if v %}{% with w=v.window|default:v.proposed_window|default:v.requested_window %}{% if w %}, have totes ready by {{ w.start|time:"g:i A" }}{% endif %}{% endwith %}{% endif %}<br>
-          {% if booking.pickup_address %}{{ booking.pickup_address }}{% else %}<span class="error">Address needed</span>{% endif %}</dd>
+          {% if booking.pickup_address %}{{ booking.pickup_address }}{% if can_change_pickup_address %} · <a href="{% url 'renter_address' token 'pickup' %}">Change</a>{% endif %}{% else %}<span class="error">Address needed</span>{% endif %}</dd>
       {% endwith %}
       <dt>At the door</dt><dd>{{ booking.get_presence_display }}{% if booking.time_request %}<br><span class="muted">Time request: {{ booking.time_request }}</span>{% endif %}</dd>
       {% if booking.access_notes %}<dt>Notes</dt><dd>{{ booking.access_notes|linebreaksbr }}</dd>{% endif %}

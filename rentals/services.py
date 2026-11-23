@@ -570,9 +570,45 @@ def set_pickup_address(booking, address_data, miles):
     """Add (or change) the moving-in address before dropoff, updating delivery fees."""
     if booking.status not in EDITABLE_STATUSES:
         raise pricing.PricingError("This booking can't be changed online anymore.")
-    fees = delivery_fees(booking.dropoff_miles or 0, miles)  # raises OutOfRange if too far
-    booking.pickup_address = _address(address_data)
-    booking.pickup_miles = round(miles)
+    return change_address(booking, "pickup", address_data, miles)
+
+
+def address_change_allowed(booking, kind, now=None):
+    """Can the renter change this address online right now? (bool, reason if not)"""
+    now = now or timezone.now()
+    if kind == "dropoff":
+        if booking.status not in CHANGEABLE_STATUSES:
+            return False, "The totes are already delivered."
+        if now >= changes_allowed_until(booking):
+            return False, f"Changes close {BusinessSettings.load().cancel_cutoff_hours} hours before dropoff."
+        return True, ""
+    if booking.status not in CHANGEABLE_STATUSES + [Booking.Status.OUT]:
+        return False, "This booking can't be changed online anymore."
+    if timezone.localdate(now) >= booking.pickup_date:
+        return False, "It's pickup day."
+    return True, ""
+
+
+@transaction.atomic
+def change_address(booking, kind, address_data, miles, now=None):
+    """Change the dropoff or pickup address, re-pricing the delivery fees.
+
+    After dropoff (card already charged), a change that would alter the
+    delivery fee isn't done online. Raises CannotChange or OutOfRange.
+    """
+    booking = Booking.objects.select_for_update().get(pk=booking.pk)
+    ok, reason = address_change_allowed(booking, kind, now)
+    if not ok:
+        raise CannotChange(f"{reason} Please contact us to change the address.")
+    drop = miles if kind == "dropoff" else (booking.dropoff_miles or 0)
+    pick = miles if kind == "pickup" else booking.pickup_miles
+    fees = delivery_fees(drop, pick)  # raises OutOfRange if too far
+    new_total = sum((a for _, a in fees), pricing.ZERO)
+    if booking.status == Booking.Status.OUT and new_total != booking.delivery_fee:
+        raise CannotChange("That address changes the delivery fee, so we'll sort it out with you directly. "
+                           "Please contact us.")
+    setattr(booking, f"{kind}_address", _address(address_data))
+    setattr(booking, f"{kind}_miles", round(miles))
     booking.price_lines.filter(kind=PriceLine.Kind.DELIVERY).delete()
     start = booking.price_lines.count()
     for i, (description, amount) in enumerate(fees):

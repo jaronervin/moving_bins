@@ -169,6 +169,21 @@ def not_ready(booking):
            "contact_phone": s.contact_phone, "window": _visit_window(booking, "pickup")})
 
 
+def address_changed(booking, kind):
+    """To the renter after an address change; the owners need it for the route."""
+    address = getattr(booking, f"{kind}_address")
+    what = "moving-out (dropoff)" if kind == "dropoff" else "moving-in (pickup)"
+    total = sum((line.amount for line in booking.price_lines.all()), 0)
+    _send([booking.customer.email], "rentals/email/address_subject.txt", "rentals/email/address_body.txt",
+          {"booking": booking, "what": what, "address": address, "total": total,
+           "link": booking_url(booking, absolute=True), "contact_email": BusinessSettings.load().contact_email})
+    day = booking.dropoff_date if kind == "dropoff" else booking.pickup_date
+    owner_alert(f"New {kind} address: {booking.reference}",
+                f"{booking.customer.name} changed the {what} address for {booking.reference} "
+                f"({kind} {day:%a %b %-d}) to {address} ({getattr(booking, f'{kind}_miles')} mi). "
+                f"Delivery fees now ${booking.delivery_fee}.")
+
+
 def change_requested(booking):
     """To the renter when the owners ask for a change during the review window."""
     _send([booking.customer.email], "rentals/email/change_subject.txt", "rentals/email/change_body.txt",

@@ -9,8 +9,8 @@ from datetime import timedelta
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
-from . import emails, payments, pricing, services, windows
-from .forms import ExtrasForm, PackageForm
+from . import emails, maps, payments, pricing, services, windows
+from .forms import AddressForm, ExtrasForm, PackageForm
 from .links import booking_url
 from .models import BusinessSettings, Package, Product
 from .payment_views import _booking
@@ -110,4 +110,40 @@ def add_week(request, token):
         "booking": booking, "settings": BusinessSettings.load(), "token": token,
         "new_pickup": booking.pickup_date + timedelta(days=7),
         "payments_on": payments.enabled(),
+    })
+
+
+ADDRESS_LABELS = {"dropoff": "moving-out address (where we drop off)",
+                  "pickup": "moving-in address (where we pick up)"}
+
+
+def change_address(request, token, kind):
+    booking = _booking(token)
+    if kind not in ADDRESS_LABELS:
+        return redirect(booking_url(booking))
+    ok, reason = services.address_change_allowed(booking, kind)
+    if not ok:
+        messages.error(request, f"{reason} Please contact us to change the address.")
+        return redirect(booking_url(booking))
+    current = getattr(booking, f"{kind}_address")
+    initial = {k: getattr(current, k) for k in ("line1", "line2", "city", "state", "zip_code")} if current else None
+    form = AddressForm(request.POST or None, prefix=kind, initial=initial)
+    s = BusinessSettings.load()
+    if request.method == "POST" and form.is_valid():
+        address = {k: form.cleaned_data.get(k, "") for k in ("line1", "line2", "city", "state", "zip_code")}
+        try:
+            place, miles = maps.lookup(address, s.base_lat, s.base_lng)
+            booking = services.change_address(booking, kind, {**address, "lat": place.lat, "lng": place.lng,
+                                                              "place_id": place.place_id}, miles)
+        except (maps.AddressNotFound, pricing.PricingError, services.CannotChange) as exc:
+            form.add_error(None, str(exc))
+        except maps.MapsUnavailable as exc:
+            messages.error(request, str(exc))
+        else:
+            emails.address_changed(booking, kind)
+            messages.success(request, "Address updated. We've emailed you a confirmation.")
+            return redirect(booking_url(booking))
+    return render(request, "rentals/change_address.html", {
+        "booking": booking, "form": form, "kind": kind, "label": ADDRESS_LABELS[kind], "current": current,
+        "settings": s, "token": token,
     })

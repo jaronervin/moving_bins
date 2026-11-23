@@ -1,0 +1,10 @@
+{% autoescape off %}Hi {{ booking.customer.name }},
+
+Your {{ what }} address for booking {{ booking.reference }} is now:
+
+  {{ address }}
+
+{% if booking.delivery_fee %}Delivery fees: ${{ booking.delivery_fee }}. {% endif %}Total before tax: ${{ total }}.
+
+Your booking: {{ link }}
+Questions? {{ contact_email }}{% endautoescape %}
