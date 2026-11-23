@@ -2,7 +2,7 @@
 
 Thanks for moving with reusable totes! Here's your booking:
 
-  {{ booking.package.name }} package, {{ booking.weeks }} weeks
+  {{ booking.package.name }} package, {{ booking.weeks }} weeks{% if booking.upgrade %} + {{ booking.upgrade.name }}{% endif %}
   {% for line in booking.lines.all %}{{ line.quantity|counted:line.product.name }}
   {% endfor %}
   Dropoff: {{ booking.dropoff_date|date:"l, F j" }}{% with v=booking.visits.all.0 %}{% if v.window %}, delivered by {{ v.window.end|time:"g:i A" }}{% endif %}{% endwith %}

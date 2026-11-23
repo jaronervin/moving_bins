@@ -23,7 +23,7 @@ from django.urls import reverse
 from . import emails, inventory, maps, payments, pricing, services, signing, windows
 from .forms import AddressForm, ContactForm, DeliveryForm, ExtrasForm, PackageForm, PickupAddressForm, SignForm
 from .links import booking_url, make_token
-from .models import BusinessSettings, Package, Product
+from .models import BusinessSettings, Package, Product, Upgrade
 
 SESSION_KEY = "draft"
 STEPS = [("package", "Package"), ("extras", "Extras"), ("addresses", "Addresses"),
@@ -123,18 +123,21 @@ def extras(request):
         return r
     draft = _draft(request)
     products = Product.objects.filter(active=True, kind__in=[Product.Kind.RENTAL, Product.Kind.SALE])
-    initial = {"addon_totes": draft.get("addon_totes", 0),
+    upgrade = Upgrade.objects.filter(active=True).prefetch_related("items__product").first()
+    initial = {"addon_totes": draft.get("addon_totes", 0), "upgrade": bool(draft.get("upgrade")),
                **{f"x_{k}": v for k, v in draft.get("extras", {}).items()}}
-    form = ExtrasForm(request.POST or None, initial=initial, products=products)
+    form = ExtrasForm(request.POST or None, initial=initial, products=products, upgrade=upgrade)
     if request.method == "POST" and form.is_valid():
         addon = form.cleaned_data.get("addon_totes") or 0
-        order = services.order_from_draft({**draft, "addon_totes": addon, "extras": form.extras()})
+        upgrade_id = upgrade.pk if upgrade and form.cleaned_data.get("upgrade") else None
+        order = services.order_from_draft({**draft, "addon_totes": addon, "extras": form.extras(),
+                                           "upgrade": upgrade_id})
         dropoff, _ = _dates(draft)
         for product, wanted, free in services.free_counts(order, dropoff):
             if wanted > free:
                 form.add_error(None, services.availability_message(product, wanted))
         if form.is_valid():
-            _save(request, addon_totes=addon, extras=form.extras())
+            _save(request, addon_totes=addon, extras=form.extras(), upgrade=upgrade_id)
             return redirect("book_addresses")
     # Items with none left for these dates say "contact us" (we may be able to buy more in time).
     dropoff, pickup = _dates(draft)
@@ -144,7 +147,7 @@ def extras(request):
             p.track_stock and inventory.available(p, dropoff, pickup) <= package_qty.get(p, 0))
     tote = Package.objects.get(pk=draft["package_id"]).tote_product
     return _render(request, "extras", "rentals/book/extras.html", {
-        "form": form, "tote": tote,
+        "form": form, "tote": tote, "upgrade": upgrade, "min_weeks": BusinessSettings.load().min_weeks,
         "rentals": form.rows(Product.Kind.RENTAL), "sales": form.rows(Product.Kind.SALE),
     })
 

@@ -29,6 +29,7 @@
         {% for d in open_dates %}{{ d|date:"D M j" }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
       <h2>Extras</h2>
       {{ extras_form.non_field_errors }}
+      {% with form=extras_form %}{% include "rentals/book/_upgrade.html" %}{% endwith %}
       <div class="qty-row">
         <label for="{{ extras_form.addon_totes.id_for_label }}">Extra totes
           <span class="muted">${{ tote.addon_price|floatformat:"-2" }} each for {{ settings.min_weeks }} weeks, then ${{ tote.addon_extra_week_price|floatformat:"-2" }}/week</span></label>

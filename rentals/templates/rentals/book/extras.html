@@ -13,6 +13,7 @@
       {{ form.addon_totes }}
     </div>
     {{ form.addon_totes.errors }}
+    {% include "rentals/book/_upgrade.html" %}
     <h3>Rent (one-time fee)</h3>
     {% for p, field in rentals %}
       <div class="qty-row"><label for="{{ field.id_for_label }}">{{ p.name }} <span class="muted">${{ p.price|floatformat:"-2" }}</span>

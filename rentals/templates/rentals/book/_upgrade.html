@@ -1,0 +1,11 @@
+{% if upgrade and form.upgrade %}
+<label class="upgrade" for="{{ form.upgrade.id_for_label }}">
+  {{ form.upgrade }}
+  <span class="upgrade-body">
+    <span class="upgrade-head"><b>{{ upgrade.name }}</b>
+      <span class="upgrade-price">${{ upgrade.price|floatformat:"-2" }}</span></span>
+    <span class="muted">{{ min_weeks }} weeks, then ${{ upgrade.extra_week_price|floatformat:"-2" }}/week · {{ upgrade.description }}</span>
+    <span class="upgrade-items">Includes {% for item in upgrade.items.all %}{{ item.label }}{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.</span>
+  </span>
+</label>
+{% endif %}

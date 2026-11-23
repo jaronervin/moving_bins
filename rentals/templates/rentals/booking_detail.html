@@ -50,7 +50,7 @@
   <section class="card">
     <h2>Details</h2>
     <dl class="facts">
-      <dt>Package</dt><dd>{{ booking.package.name|default:"Custom" }}, {{ booking.weeks }} weeks</dd>
+      <dt>Package</dt><dd>{{ booking.package.name|default:"Custom" }}, {{ booking.weeks }} weeks{% if booking.upgrade %} + {{ booking.upgrade.name }}{% endif %}</dd>
       <dt>Items</dt><dd>{% for line in lines %}{{ line.quantity|counted:line.product.name }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd>
       {% with v=visits.dropoff %}
       <dt>Dropoff</dt>

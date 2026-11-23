@@ -329,7 +329,7 @@ def charge(booking, kind, amount, description):
 
 def charge_late_cancel(booking):
     """Late cancellation: a percent of the rental, taken from the hold if there is one."""
-    rental = sum((l.amount for l in booking.price_lines.filter(kind__in=["package", "addon", "rental"])),
+    rental = sum((l.amount for l in booking.price_lines.filter(kind__in=pricing.RENTAL_KINDS)),
                  pricing.ZERO)
     amount = pricing.late_cancel_charge(rental, BusinessSettings.load().late_cancel_charge_percent)
     hold = _rental_hold(booking)

@@ -297,6 +297,39 @@ class PackageItem(models.Model):
         return counted(self.quantity, self.product.name)
 
 
+class Upgrade(models.Model):
+    """An optional add-on any package can take, priced like a package
+    (for the minimum rental length, plus a weekly price after that)."""
+
+    name = models.CharField(max_length=60)
+    description = models.CharField(max_length=200, blank=True)
+    price = models.DecimalField(max_digits=8, decimal_places=2, help_text="For the minimum rental length.")
+    extra_week_price = models.DecimalField(max_digits=8, decimal_places=2)
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.name
+
+
+class UpgradeItem(models.Model):
+    """What an upgrade includes, e.g. 10 moving blankets (counted against stock)."""
+
+    upgrade = models.ForeignKey(Upgrade, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return self.label
+
+    @property
+    def label(self):
+        return counted(self.quantity, self.product.name)
+
+
 # ---------------------------------------------------------------------------
 # Inventory ledger
 # ---------------------------------------------------------------------------
@@ -539,6 +572,7 @@ class Booking(models.Model):
         max_length=200, blank=True, help_text="Renter's note asking for a more specific time."
     )
     package = models.ForeignKey("Package", on_delete=models.PROTECT, null=True, blank=True)
+    upgrade = models.ForeignKey("Upgrade", on_delete=models.PROTECT, null=True, blank=True)
     renewal_week_price = models.DecimalField(
         max_digits=8, decimal_places=2, default=Decimal("0"),
         help_text="Charged per extra week if bins aren't ready at pickup (locked at booking).",
@@ -609,6 +643,7 @@ class PriceLine(models.Model):
 
     class Kind(models.TextChoices):
         PACKAGE = "package", "Package"
+        UPGRADE = "upgrade", "Upgrade"
         ADDON = "addon", "Extra totes"
         RENTAL = "rental", "Rental extra"
         SALE = "sale", "Sale item"

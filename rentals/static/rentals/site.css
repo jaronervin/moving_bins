@@ -207,3 +207,12 @@ button.danger { background: var(--warn); border-color: var(--warn); }
 .door-done { margin-top: 10px; font-weight: 700; color: var(--accent); }
 .with-action { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .with-action .link-button { font-size: .9rem; }
+/* Premium upgrade option (Extras step and Change booking) */
+.upgrade { display: flex; gap: 12px; align-items: flex-start; margin: 16px 0 4px; padding: 14px 16px;
+           border: 2px solid var(--line); border-radius: 12px; cursor: pointer; font-weight: 400; }
+.upgrade:has(input:checked) { border-color: var(--accent); background: var(--bg); }
+.upgrade input { margin-top: 4px; }
+.upgrade-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.upgrade-head { display: flex; justify-content: space-between; gap: 12px; }
+.upgrade-price { font-weight: 700; color: var(--accent); }
+.upgrade-items { font-size: .95rem; }

@@ -100,7 +100,7 @@ class Quote:
     @property
     def rental_subtotal(self):
         """Package, extra totes and rental extras (what a late cancel is a percent of)."""
-        return self._sum("package", "addon", "rental")
+        return self._sum(*RENTAL_KINDS)
 
     @property
     def sales_subtotal(self):
@@ -115,12 +115,23 @@ class Quote:
         return self.rental_subtotal + self.sales_subtotal + self.delivery_total
 
 
+# Price lines that count as "the rental" (late-cancel percent; not delivery or sale items).
+RENTAL_KINDS = ("package", "upgrade", "addon", "rental")
+
+
+@dataclass
+class UpgradeTerms:
+    name: str
+    price: Decimal  # for the minimum rental length
+    extra_week_price: Decimal
+
+
 def _weeks_label(weeks):
     return f"{weeks} week{'s' if weeks != 1 else ''}"
 
 
 def price_order(package, weeks, min_weeks, max_weeks=None, addon_totes=0, addon_price=ZERO,
-                addon_extra_week_price=ZERO, extras=(), delivery=()):
+                addon_extra_week_price=ZERO, extras=(), delivery=(), upgrade=None):
     """Price an order.
 
     ``package`` is PackageTerms. ``extras`` is [(kind, name, quantity, unit_price)]
@@ -137,6 +148,10 @@ def price_order(package, weeks, min_weeks, max_weeks=None, addon_totes=0, addon_
 
     pkg_amount = to_cents(Decimal(package.price) + Decimal(package.extra_week_price) * extra_weeks)
     q.lines.append(Line("package", f"{package.name} package, {_weeks_label(weeks)}", 1, pkg_amount, pkg_amount))
+
+    if upgrade is not None:
+        up_amount = to_cents(Decimal(upgrade.price) + Decimal(upgrade.extra_week_price) * extra_weeks)
+        q.lines.append(Line("upgrade", f"{upgrade.name}, {_weeks_label(weeks)}", 1, up_amount, up_amount))
 
     if addon_totes:
         per_tote = to_cents(Decimal(addon_price) + Decimal(addon_extra_week_price) * extra_weeks)
@@ -156,6 +171,7 @@ def price_order(package, weeks, min_weeks, max_weeks=None, addon_totes=0, addon_
 
     q.renewal_week_price = to_cents(
         Decimal(package.extra_week_price) + Decimal(addon_extra_week_price) * addon_totes
+        + (Decimal(upgrade.extra_week_price) if upgrade is not None else ZERO)
     )
     return q
 

@@ -408,3 +408,64 @@ class AddressPriceConfirmTests(AddressChangeTests):
     def test_same_price_saves_straight_away(self):
         self.assertContains(self.post("pickup", "21403"), "Address updated")  # 28 mi: still $25
 
+
+
+class UpgradeTests(FlowTestCase):
+    def upgrade(self):
+        from rentals.models import Upgrade
+        return Upgrade.objects.get()
+
+    def test_placeholder_upgrade(self):
+        up = self.upgrade()
+        self.assertEqual((up.price, up.extra_week_price), (D("79.00"), D("20.00")))
+        self.assertEqual({i.product.slug: i.quantity for i in up.items.all()},
+                         {"moving-blanket": 10, "floor-door-protection": 1})
+
+    def test_booking_with_the_upgrade(self):
+        self.assertRedirects(self.step_package(), "/book/extras/")
+        self.assertContains(self.client.get("/book/extras/"), "Includes 10 moving blankets and 1 floor runner")
+        r = self.client.post("/book/extras/", {"addon_totes": 0, "upgrade": "on"})
+        self.assertRedirects(r, "/book/addresses/")
+        # finish the walk (re-posting the earlier steps is harmless)
+        self.client.post("/book/addresses/", {**__import__("rentals.tests.test_booking_flow", fromlist=["address"]).address("dropoff"),
+                                              "pickup-unknown": "on"})
+        self.client.post("/book/delivery/", {"presence": "porch"})
+        self.client.post("/book/contact/", {"name": "Pat Renter", "email": "pat@example.com", "phone": "1"})
+        self.assertContains(self.client.get("/book/review/"), "+ Premium upgrade")
+        self.client.post("/book/review/", {"agree": "on", "typed_name": "Pat Renter"})
+        b = Booking.objects.get()
+        self.assertEqual(b.upgrade, self.upgrade())
+        lines = {l.kind: l.amount for l in b.price_lines.all()}
+        # 3 weeks: 79 + 20
+        self.assertEqual(lines["upgrade"], D("99.00"))
+        self.assertEqual(b.renewal_week_price, D("85.00"))  # 2BR 65 + upgrade 20
+        items = {l.product.slug: l.quantity for l in b.lines.all()}
+        self.assertEqual((items["moving-blanket"], items["floor-door-protection"]), (10, 1))
+        # late cancel counts the upgrade as rental
+        self.assertEqual(services.cancel_fee(b, services.free_cancel_until(b)), D("166.50"))  # 50% of 234+99
+
+    def test_add_and_remove_with_change_booking(self):
+        self.walk(extras={"moving-blanket": 2})
+        b = Booking.objects.get()
+        url = f"/b/{links.make_token(b)}/change/"
+        data = {"package": pkg("2br").pk, "weeks": 3, "dropoff_date": self.dropoff.isoformat(), "addon_totes": 0,
+                f"x_{product('moving-blanket').pk}": 2, "upgrade": "on", "confirm": "1"}
+        self.client.post(url, data)
+        b.refresh_from_db()
+        self.assertEqual(b.upgrade, self.upgrade())
+        self.assertEqual({l.product.slug: l.quantity for l in b.lines.all()}["moving-blanket"], 12)
+        order = services.order_from_booking(b)  # the 2 extra blankets stay extras
+        self.assertEqual({p.slug: q for p, q in order.extras.items()}, {"moving-blanket": 2})
+        data.pop("upgrade")
+        self.client.post(url, data)
+        b.refresh_from_db()
+        self.assertIsNone(b.upgrade)
+        self.assertFalse(b.price_lines.filter(kind="upgrade").exists())
+
+    def test_blanket_stock_includes_the_upgrade(self):
+        p = product("moving-blanket")
+        p.planned_capacity = 5
+        p.save()
+        self.step_package()
+        r = self.client.post("/book/extras/", {"addon_totes": 0, "upgrade": "on"})
+        self.assertContains(r, "check availability for 10 moving blankets")

@@ -141,8 +141,8 @@ DATABASE_URL=postgres://user@localhost:5432/moving_bins python manage.py test re
 
 All in the admin (Business settings, Products, Packages):
 
-- [ ] **Premium upgrade ($79)**: waiting on Katie's list of what's included (moving blankets, door jamb
-      protectors, etc.), which packages can add it, and whether it's one-time.
+- [ ] **Premium upgrade ($79 / 2 weeks)**: built with placeholder contents (10 blankets + 1 floor/door set) and
+      a placeholder $20/extra week. Put Katie's list and weekly price in admin › Upgrades.
 - [ ] **Base location:** approx. center of ZIP 21214; set the real coordinates.
 - [ ] **Extras stock:** planning counts are rough (none owned yet; see SPEC §2.2). Adjust "Planned capacity"
       in admin as you buy.

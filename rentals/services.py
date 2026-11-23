@@ -13,7 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from . import inventory, pricing
-from .models import Booking, BookingLine, BusinessSettings, Package, PriceLine, Product, counted
+from .models import Booking, BookingLine, BusinessSettings, Package, PriceLine, Product, Upgrade, counted
 
 
 def availability_message(product, wanted):
@@ -43,6 +43,7 @@ class Order:
     weeks: int
     addon_totes: int = 0
     extras: dict = field(default_factory=dict)  # {Product: quantity}, rental extras and sale items
+    upgrade: object = None  # Upgrade or None
 
     def items(self):
         """[(product, quantity)] of everything that leaves the warehouse."""
@@ -55,6 +56,9 @@ class Order:
         add(self.package.tote_product, self.package.totes + self.addon_totes)
         for item in self.package.items.select_related("product"):
             add(item.product, item.quantity)
+        if self.upgrade is not None:
+            for item in self.upgrade.items.select_related("product"):
+                add(item.product, item.quantity)
         for product, qty in self.extras.items():
             add(product, qty)
         return sorted(totals.items(), key=lambda pq: pq[0].pk)
@@ -87,6 +91,8 @@ def quote(order, dropoff_miles=None, pickup_miles=None):
         addon_totes=order.addon_totes, addon_price=tote.addon_price,
         addon_extra_week_price=tote.addon_extra_week_price,
         extras=extras, delivery=delivery_fees(dropoff_miles, pickup_miles),
+        upgrade=(pricing.UpgradeTerms(order.upgrade.name, order.upgrade.price, order.upgrade.extra_week_price)
+                 if order.upgrade is not None else None),
     )
 
 
@@ -187,8 +193,9 @@ def order_from_draft(draft):
     ids = [int(k) for k, v in draft.get("extras", {}).items() if int(v) > 0]
     for p in Product.objects.filter(pk__in=ids, active=True):
         extras[p] = int(draft["extras"][str(p.pk)])
+    upgrade = Upgrade.objects.filter(pk=draft["upgrade"], active=True).first() if draft.get("upgrade") else None
     return Order(package=package, weeks=int(draft["weeks"]),
-                 addon_totes=int(draft.get("addon_totes", 0)), extras=extras)
+                 addon_totes=int(draft.get("addon_totes", 0)), extras=extras, upgrade=upgrade)
 
 
 @transaction.atomic
@@ -235,6 +242,7 @@ def submit_booking(draft, now=None, signature=None):
     booking = Booking(
         customer=customer,
         package=order.package,
+        upgrade=order.upgrade,
         dropoff_date=dropoff_date,
         weeks=order.weeks,
         dropoff_address=_address(draft["dropoff"]),
@@ -393,7 +401,7 @@ def cancel_fee(booking, now=None):
         return pricing.ZERO
     if now < dropoff_starts_at(booking) - timedelta(hours=s.cancel_cutoff_hours):
         return pricing.ZERO
-    rental = sum((l.amount for l in booking.price_lines.filter(kind__in=["package", "addon", "rental"])),
+    rental = sum((l.amount for l in booking.price_lines.filter(kind__in=pricing.RENTAL_KINDS)),
                  pricing.ZERO)
     return pricing.late_cancel_charge(rental, s.late_cancel_charge_percent)
 
@@ -452,6 +460,9 @@ def order_from_booking(booking):
     included = {package.tote_product: package.totes}
     for item in package.items.select_related("product"):
         included[item.product] = included.get(item.product, 0) + item.quantity
+    if booking.upgrade is not None:
+        for item in booking.upgrade.items.select_related("product"):
+            included[item.product] = included.get(item.product, 0) + item.quantity
     addon, extras = 0, {}
     for line in booking.lines.select_related("product"):
         more = line.quantity - included.get(line.product, 0)
@@ -461,7 +472,7 @@ def order_from_booking(booking):
             addon = more
         else:
             extras[line.product] = more
-    return Order(package=package, weeks=booking.weeks, addon_totes=addon, extras=extras)
+    return Order(package=package, weeks=booking.weeks, addon_totes=addon, extras=extras, upgrade=booking.upgrade)
 
 
 def changes_allowed_until(booking):
@@ -508,6 +519,7 @@ def change_booking(booking, order, dropoff_date, now=None):
         raise CannotChange(f"Changes close {hours} hours before dropoff. Please contact us.")
     the_quote = quote(order, booking.dropoff_miles, booking.pickup_miles)
     booking.package = order.package
+    booking.upgrade = order.upgrade
     booking.weeks = order.weeks
     booking.dropoff_date = dropoff_date
     booking.save()  # new pickup date

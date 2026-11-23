@@ -2,7 +2,7 @@
 
 Your booking {{ booking.reference }} is updated:
 
-  {{ booking.package.name }}, {{ booking.weeks }} weeks
+  {{ booking.package.name }}, {{ booking.weeks }} weeks{% if booking.upgrade %} + {{ booking.upgrade.name }}{% endif %}
   Dropoff: {{ booking.dropoff_date|date:"l, F j" }}
   Pickup:  {{ booking.pickup_date|date:"l, F j" }}
 

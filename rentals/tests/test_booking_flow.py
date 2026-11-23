@@ -213,6 +213,7 @@ class ExtrasAvailabilityTests(FlowTestCase):
         p.save()
         self.to_extras()
         page = self.client.get("/book/extras/").content.decode()
+        page = page[page.index("Rent (one-time fee)"):]  # the item rows, after the upgrade box
         row = page[page.index("Appliance dolly"):page.index("Moving blanket")]
         self.assertIn("for availability", row)
         row = page[page.index("Moving blanket"):page.index("Wardrobe box")]

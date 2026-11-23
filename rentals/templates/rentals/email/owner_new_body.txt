@@ -1,6 +1,6 @@
 {% load rentals_extras %}{% autoescape off %}{{ booking.customer.name }} ({{ booking.customer.email }}{% if booking.customer.phone %}, {{ booking.customer.phone }}{% endif %})
 
-{{ booking.package.name }} package, {{ booking.weeks }} weeks
+{{ booking.package.name }} package, {{ booking.weeks }} weeks{% if booking.upgrade %} + {{ booking.upgrade.name }}{% endif %}
 {% for line in booking.lines.all %}  {{ line.quantity|counted:line.product.name }}
 {% endfor %}
 Dropoff {{ booking.dropoff_date|date:"D M j" }}: {{ booking.dropoff_address }} ({{ booking.dropoff_miles }} mi)

@@ -19,6 +19,8 @@ from .models import (
     PackageItem,
     PriceLine,
     Product,
+    Upgrade,
+    UpgradeItem,
     Signature,
     StockMovement,
     StockState,
@@ -60,6 +62,18 @@ class PackageAdmin(admin.ModelAdmin):
     list_editable = ["price", "extra_week_price", "active", "sort_order"]
     prepopulated_fields = {"slug": ["name"]}
     inlines = [PackageItemInline]
+
+
+class UpgradeItemInline(admin.TabularInline):
+    model = UpgradeItem
+    extra = 0
+
+
+@admin.register(Upgrade)
+class UpgradeAdmin(admin.ModelAdmin):
+    list_display = ["name", "price", "extra_week_price", "active"]
+    list_editable = ["price", "extra_week_price", "active"]
+    inlines = [UpgradeItemInline]
 
 
 @admin.register(Product)

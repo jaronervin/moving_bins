@@ -12,7 +12,7 @@ from django.shortcuts import redirect, render
 from . import emails, maps, payments, pricing, services, windows
 from .forms import AddressForm, ExtrasForm, PackageForm
 from .links import booking_url
-from .models import Booking, BusinessSettings, Package, Product
+from .models import Booking, BusinessSettings, Package, Product, Upgrade
 from .payment_views import _booking
 
 
@@ -59,13 +59,16 @@ def change(request, token):
                                max_weeks=s.max_weeks, initial={
                                    "package": current.package.pk, "weeks": current.weeks,
                                    "dropoff_date": booking.dropoff_date})
-    extras_form = ExtrasForm(request.POST or None, products=products, initial={
-        "addon_totes": current.addon_totes, **{f"x_{p.pk}": q for p, q in current.extras.items()}})
+    upgrade = Upgrade.objects.filter(active=True).prefetch_related("items__product").first()
+    extras_form = ExtrasForm(request.POST or None, products=products, upgrade=upgrade, initial={
+        "addon_totes": current.addon_totes, "upgrade": current.upgrade is not None,
+        **{f"x_{p.pk}": q for p, q in current.extras.items()}})
     if request.method == "POST" and package_form.is_valid() and extras_form.is_valid():
         d = package_form.cleaned_data
         extras = {p: int(q) for p in products if (q := extras_form.cleaned_data.get(f"x_{p.pk}"))}
         order = services.Order(package=d["package"], weeks=d["weeks"],
-                               addon_totes=extras_form.cleaned_data.get("addon_totes") or 0, extras=extras)
+                               addon_totes=extras_form.cleaned_data.get("addon_totes") or 0, extras=extras,
+                               upgrade=upgrade if upgrade and extras_form.cleaned_data.get("upgrade") else None)
         try:
             if request.POST.get("confirm") != "1":  # first show the new price
                 preview = services.quote(order, booking.dropoff_miles, booking.pickup_miles)
@@ -87,7 +90,8 @@ def change(request, token):
         "booking": booking, "form": package_form, "extras_form": extras_form,
         "packages": Package.objects.filter(active=True).prefetch_related("items__product"),
         "rentals": extras_form.rows(Product.Kind.RENTAL), "sales": extras_form.rows(Product.Kind.SALE),
-        "tote": current.package.tote_product, "settings": s, "token": token,
+        "tote": current.package.tote_product, "settings": s, "token": token, "upgrade": upgrade,
+        "min_weeks": s.min_weeks,
         "until": services.changes_allowed_until(booking), "preview": preview,
         "current_total": sum((l.amount for l in booking.price_lines.all()), pricing.ZERO),
         "open_dates": windows.next_open_dates(package_form.earliest),

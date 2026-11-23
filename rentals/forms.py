@@ -47,9 +47,12 @@ class ExtrasForm(Form):
     addon_totes = forms.IntegerField(min_value=0, max_value=200, initial=0, required=False,
                                      label="Extra totes")
 
-    def __init__(self, *args, products=(), **kwargs):
+    def __init__(self, *args, products=(), upgrade=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.products = list(products)
+        self.upgrade = upgrade
+        if upgrade is not None:
+            self.fields["upgrade"] = forms.BooleanField(required=False, label=f"Add the {upgrade.name}")
         for p in self.products:
             self.fields[f"x_{p.pk}"] = forms.IntegerField(
                 min_value=0, max_value=50, initial=0, required=False, label=p.name,

@@ -8,7 +8,7 @@
     <h2>Your move</h2>
     <dl class="facts">
       <dt>Package</dt>
-      <dd>{{ order.package.name }}, {{ order.weeks }} weeks<br>
+      <dd>{{ order.package.name }}, {{ order.weeks }} weeks{% if order.upgrade %} + {{ order.upgrade.name }}{% endif %}<br>
         <span class="muted">{% for product, qty in items %}{{ qty|counted:product.name }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></dd>
       <dt>Dropoff</dt>
       <dd>{{ dropoff_date|date:"l, M j" }}{% if dropoff_window %}, by {{ dropoff_window.end|time:"g:i A" }}{% endif %}<br>{{ draft.dropoff.formatted }}</dd>
