@@ -452,3 +452,16 @@ class OwnerEmailRouteTests(FlowTestCase):
     def test_without_google_alerts_use_the_normal_route(self):
         self.walk()
         self.assertEqual(mail.outbox[1].to, ["owner@example.com"])
+
+
+class SiteUrlTests(TestCase):
+    def test_render_address_used_for_email_links(self):
+        import importlib
+        import os
+
+        import config.settings as conf
+        with unittest.mock.patch.dict(os.environ, {"RENDER_EXTERNAL_URL": "https://sprout-staging.onrender.com/"}):
+            os.environ.pop("SITE_URL", None)
+            importlib.reload(conf)
+            self.assertEqual(conf.SITE_URL, "https://sprout-staging.onrender.com")
+        importlib.reload(conf)

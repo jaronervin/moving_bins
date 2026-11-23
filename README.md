@@ -158,6 +158,8 @@ All in the admin (Business settings, Products, Packages):
       Apple Pay, Google Pay. Already done in test mode.
 - [ ] **Postmark:** approval requested/granted; upgrade the plan before bookings exceed ~12–15/month (the site
       warns owners at 70% and 90% of `POSTMARK_MONTHLY_LIMIT`; set it to the new plan's limit after upgrading).
+- [ ] **Domain:** point sprouttoteco.com at Render, then set `SITE_URL=https://sprouttoteco.com` (links in emails)
+      and add it to `DJANGO_ALLOWED_HOSTS`.
 - [ ] **Render Disk** (paid plan) mounted at `MEDIA_ROOT` for at-the-door photos; the free plan loses
       uploaded files on every deploy.
 - [ ] **Render paid plan:** then set up owner alerts through Google (`GOOGLE_SMTP_USER` + app password); the

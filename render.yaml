@@ -29,6 +29,8 @@ services:
         generateValue: true
       - key: DJANGO_DEBUG
         value: "0"
+      - key: SITE_URL      # used for links in emails
+        value: https://sprout-staging.onrender.com
       - key: TRUST_X_FORWARDED_FOR
         value: "1"
       - key: SITE_BANNER

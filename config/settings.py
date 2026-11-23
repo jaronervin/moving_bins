@@ -174,7 +174,9 @@ OWNER_EMAILS = [e.strip() for e in os.environ.get("OWNER_EMAILS", "").split(",")
 SITE_BANNER = os.environ.get("SITE_BANNER", "")
 
 # Used to build links in emails, e.g. https://example.com (no trailing slash).
-SITE_URL = os.environ.get("SITE_URL", "http://127.0.0.1:8000")
+# On Render, RENDER_EXTERNAL_URL is the site's own https address; set SITE_URL
+# once the real domain (sprouttoteco.com) points at the site.
+SITE_URL = (os.environ.get("SITE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "http://127.0.0.1:8000").rstrip("/")
 
 # How long the private booking link in an email keeps working.
 BOOKING_LINK_MAX_AGE_DAYS = 120
