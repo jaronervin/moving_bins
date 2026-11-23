@@ -465,3 +465,17 @@ class SiteUrlTests(TestCase):
             importlib.reload(conf)
             self.assertEqual(conf.SITE_URL, "https://sprout-staging.onrender.com")
         importlib.reload(conf)
+
+
+class HonestEmailMessageTests(FlowTestCase):
+    def test_page_says_so_when_the_email_fails(self):
+        with unittest.mock.patch("django.core.mail.EmailMessage.send", side_effect=OSError("rejected")), \
+                self.assertLogs("rentals.emails", level="ERROR"):
+            r = self.client.get(self.walk()["Location"])
+        self.assertContains(r, "We couldn&#x27;t email pat@example.com just now")
+        self.assertIsNone(Booking.objects.get().confirmation_sent_at)
+
+    def test_page_confirms_when_it_went_out(self):
+        r = self.client.get(self.walk()["Location"])
+        self.assertContains(r, "We&#x27;ve emailed a confirmation to pat@example.com")
+        self.assertIsNotNone(Booking.objects.get().confirmation_sent_at)

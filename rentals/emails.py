@@ -33,22 +33,25 @@ def _send(to, subject_template, body_template, context, attachments=(), owners=F
     msg = EmailMessage(subject, body, sender, to, connection=connection)
     for name, content, mime in attachments:
         msg.attach(name, content, mime)
-    _deliver(msg)
+    return _deliver(msg)
 
 
 def _deliver(msg):
-    """Send; if the owner route (Google) fails, fall back to the normal route."""
+    """Send; if the owner route (Google) fails, fall back to the normal route.
+    Returns True if the email went out."""
     try:
         msg.send()
-        return
+        return True
     except Exception:
         log.exception("Email %r to %s failed", msg.subject, msg.to)
     if msg.connection is not None:  # Google route failed: try the site's normal route once
         msg.connection, msg.from_email = None, settings.DEFAULT_FROM_EMAIL
         try:
             msg.send()
+            return True
         except Exception:
             log.exception("Fallback for %r failed too", msg.subject)
+    return False
 
 
 def booking_requested(booking):
@@ -63,8 +66,12 @@ def booking_requested(booking):
         from .signing import pdf_bytes
 
         attachments.append((f"Sprout-Tote-agreement-{booking.reference}.pdf", pdf_bytes(sig), "application/pdf"))
-    _send([booking.customer.email], "rentals/email/requested_subject.txt",
-          "rentals/email/requested_body.txt", {**context, "signed": sig is not None}, attachments)
+    sent = _send([booking.customer.email], "rentals/email/requested_subject.txt",
+                 "rentals/email/requested_body.txt", {**context, "signed": sig is not None}, attachments)
+    if sent:
+        from django.utils import timezone
+
+        type(booking).objects.filter(pk=booking.pk).update(confirmation_sent_at=timezone.now())
     if settings.OWNER_EMAILS:
         from . import inventory
 
@@ -76,6 +83,7 @@ def booking_requested(booking):
               {**context, "admin_link": admin_link, "needs": needs,
                "ops_link": f"{settings.SITE_URL}/ops/",
                "lead_days": BusinessSettings.load().purchase_lead_business_days}, owners=True)
+    return sent
 
 
 def booking_links(email, bookings):
@@ -94,35 +102,38 @@ def booking_declined(booking):
 def booking_cancelled(booking, late_charge=None):
     """To the renter after they cancel online; heads-up to the owners."""
     s = BusinessSettings.load()
-    _send([booking.customer.email], "rentals/email/cancelled_subject.txt", "rentals/email/cancelled_body.txt",
+    sent = _send([booking.customer.email], "rentals/email/cancelled_subject.txt", "rentals/email/cancelled_body.txt",
           {"booking": booking, "late_charge": late_charge, "contact_email": s.contact_email,
            "site_url": settings.SITE_URL})
     fee = f" Late-cancellation charge: ${late_charge.total} ({late_charge.get_status_display()})." if late_charge else ""
     owner_alert(f"Cancelled: {booking.reference}",
                 f"{booking.customer.name} cancelled {booking.reference} (dropoff {booking.dropoff_date:%a %b %-d})."
                 f"{fee} The totes and delivery stops are free again.")
+    return sent
 
 
 def booking_changed(booking):
     """To the renter after they change their booking online; heads-up to the owners."""
     s = BusinessSettings.load()
     total = sum((line.amount for line in booking.price_lines.all()), 0)
-    _send([booking.customer.email], "rentals/email/changed_subject.txt", "rentals/email/changed_body.txt",
+    sent = _send([booking.customer.email], "rentals/email/changed_subject.txt", "rentals/email/changed_body.txt",
           {"booking": booking, "total": total, "link": booking_url(booking, absolute=True),
            "contact_email": s.contact_email})
     owner_alert(f"Changed: {booking.reference}",
                 f"{booking.customer.name} changed {booking.reference}: {booking.package} for {booking.weeks} weeks, "
                 f"dropoff {booking.dropoff_date:%a %b %-d}, pickup {booking.pickup_date:%a %b %-d}. "
                 f"New total before tax: ${total}.")
+    return sent
 
 
 def booking_extended(booking, charge=None):
     """To the renter after they add a week; heads-up to the owners."""
-    _send([booking.customer.email], "rentals/email/extended_subject.txt", "rentals/email/extended_body.txt",
+    sent = _send([booking.customer.email], "rentals/email/extended_subject.txt", "rentals/email/extended_body.txt",
           {"booking": booking, "charge": charge, "link": booking_url(booking, absolute=True)})
     owner_alert(f"Extra week: {booking.reference}",
                 f"{booking.customer.name} added a week to {booking.reference}. "
                 f"Pickup is now {booking.pickup_date:%a %b %-d}.")
+    return sent
 
 
 def _visit_window(booking, kind):
@@ -174,7 +185,7 @@ def address_changed(booking, kind):
     address = getattr(booking, f"{kind}_address")
     what = "moving-out (dropoff)" if kind == "dropoff" else "moving-in (pickup)"
     total = sum((line.amount for line in booking.price_lines.all()), 0)
-    _send([booking.customer.email], "rentals/email/address_subject.txt", "rentals/email/address_body.txt",
+    sent = _send([booking.customer.email], "rentals/email/address_subject.txt", "rentals/email/address_body.txt",
           {"booking": booking, "what": what, "address": address, "total": total,
            "link": booking_url(booking, absolute=True), "contact_email": BusinessSettings.load().contact_email})
     day = booking.dropoff_date if kind == "dropoff" else booking.pickup_date
@@ -182,6 +193,7 @@ def address_changed(booking, kind):
                 f"{booking.customer.name} changed the {what} address for {booking.reference} "
                 f"({kind} {day:%a %b %-d}) to {address} ({getattr(booking, f'{kind}_miles')} mi). "
                 f"Delivery fees now ${booking.delivery_fee}.")
+    return sent
 
 
 def change_requested(booking):
@@ -208,3 +220,11 @@ def owner_alert(subject, body):
     if settings.OWNER_EMAILS:
         connection, sender = _owner_connection()
         _deliver(EmailMessage(subject, body, sender, settings.OWNER_EMAILS, connection=connection))
+
+
+def sent_note(sent, email, what="a confirmation"):
+    """The end of an on-page message, honest about whether the email went out."""
+    if sent:
+        return f"We've emailed {what} to {email}."
+    return (f"We couldn't email {email} just now, so bookmark this page: it's your link to see or "
+            "change your booking.")

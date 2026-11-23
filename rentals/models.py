@@ -553,6 +553,9 @@ class Booking(models.Model):
     decline_reason = models.CharField(max_length=500, blank=True)
     stripe_payment_method_id = models.CharField(max_length=64, blank=True)
     stripe_checkout_session_id = models.CharField(max_length=128, blank=True)
+    confirmation_sent_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the renter's booking confirmation email went out (blank = it didn't)."
+    )
     dropoff_reminded_at = models.DateTimeField(null=True, blank=True)
     pickup_reminded_at = models.DateTimeField(null=True, blank=True)
 

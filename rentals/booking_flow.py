@@ -273,11 +273,9 @@ def _submit(request, draft, version, sign_form):
     del request.session[SESSION_KEY]
     if booking.status == booking.Status.AWAITING_CARD:
         return redirect("card", token=make_token(booking))
-    emails.booking_requested(booking)
-    if booking.status == booking.Status.CONFIRMED:
-        messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
-    else:
-        messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
+    sent = emails.booking_requested(booking)
+    start = "You're booked!" if booking.status == booking.Status.CONFIRMED else "Request sent!"
+    messages.success(request, f"{start} " + emails.sent_note(sent, booking.customer.email))
     return redirect(booking_url(booking))
 
 

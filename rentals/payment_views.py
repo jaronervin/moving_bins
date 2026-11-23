@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from . import links, payments
+from . import emails, links, payments
 from .models import Booking, BusinessSettings, Charge
 
 log = logging.getLogger(__name__)
@@ -81,10 +81,11 @@ def card_done(request, token):
         messages.error(request, "Your card wasn't saved. Please try again.")
         return redirect("card", token=token)
     booking.refresh_from_db()
+    note = emails.sent_note(booking.confirmation_sent_at is not None, booking.customer.email)
     if was_awaiting and booking.status == Booking.Status.CONFIRMED:
-        messages.success(request, "You're booked! We've emailed you a confirmation with a link back to this page.")
+        messages.success(request, f"You're booked! {note}")
     elif was_awaiting:
-        messages.success(request, "Request sent! We've emailed you a copy with a link back to this page.")
+        messages.success(request, f"Request sent! {note}")
     else:
         messages.success(request, "Thanks, your card is updated.")
     return redirect(links.booking_url(booking))

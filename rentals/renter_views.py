@@ -29,8 +29,8 @@ def cancel(request, token):
             messages.error(request, str(exc))
             return redirect(booking_url(booking))
         booking.refresh_from_db()
-        emails.booking_cancelled(booking, late)
-        messages.success(request, "Your booking is cancelled. We've emailed you a confirmation.")
+        sent = emails.booking_cancelled(booking, late)
+        messages.success(request, "Your booking is cancelled. " + emails.sent_note(sent, booking.customer.email))
         return redirect(booking_url(booking))
     return render(request, "rentals/cancel.html", {
         "booking": booking, "fee": fee, "free_until": services.free_cancel_until(booking),
@@ -79,8 +79,9 @@ def change(request, token):
             package_form.add_error(None, str(exc))
         else:
             booking.refresh_from_db()
-            emails.booking_changed(booking)
-            messages.success(request, "Your booking is updated. We've emailed you the new details.")
+            sent = emails.booking_changed(booking)
+            messages.success(request, "Your booking is updated. "
+                             + emails.sent_note(sent, booking.customer.email, "the new details"))
             return redirect(booking_url(booking))
     return render(request, "rentals/change.html", {
         "booking": booking, "form": package_form, "extras_form": extras_form,
@@ -140,8 +141,8 @@ def change_address(request, token, kind):
         except maps.MapsUnavailable as exc:
             messages.error(request, str(exc))
         else:
-            emails.address_changed(booking, kind)
-            messages.success(request, "Address updated. We've emailed you a confirmation.")
+            sent = emails.address_changed(booking, kind)
+            messages.success(request, "Address updated. " + emails.sent_note(sent, booking.customer.email))
             return redirect(booking_url(booking))
     return render(request, "rentals/change_address.html", {
         "booking": booking, "form": form, "kind": kind, "label": ADDRESS_LABELS[kind], "current": current,
