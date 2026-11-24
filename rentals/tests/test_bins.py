@@ -348,3 +348,18 @@ class StickerEpsTests(TestCase):
             self.assertIn("%%BoundingBox: 0 0 144 144", text)  # exactly 2" x 2"
             self.assertNotIn("Helvetica", text)
             self.assertNotIn("/FontName", text)  # text is outlines, no fonts needed
+
+
+class ImportCodesTests(TestCase):
+    def test_batch_file_imports_once(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from rentals.models import Bin
+        out = StringIO()
+        call_command("import_codes", "rentals/codes/batch-1.txt", stdout=out)
+        self.assertIn("150 new code(s)", out.getvalue())
+        self.assertEqual(Bin.objects.filter(status="reserved").count(), 150)
+        call_command("import_codes", "rentals/codes/batch-1.txt", stdout=out)
+        self.assertIn("0 new code(s), 150 already there", out.getvalue())
